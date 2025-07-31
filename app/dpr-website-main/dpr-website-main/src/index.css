@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Ensure proper scrolling and layout */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Fix dropdown z-index issues */
+select {
+  position: relative;
+  z-index: 50;
+}
+
+/* Ensure containers can grow */
+.container {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
