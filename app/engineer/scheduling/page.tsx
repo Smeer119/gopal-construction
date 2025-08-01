@@ -1,11 +1,60 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { format, parseISO, addDays, differenceInDays } from "date-fns";
 import { supabase } from "@/lib/supabase";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { constructionData } from "./data";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import Link from "next/link";
+
+// Recharts components for data visualization
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LabelList,
+  Label as RechartsLabel
+} from "recharts";
 
 // Icons
 import {
@@ -18,39 +67,11 @@ import {
   CheckCircle,
   Clock,
   Trash2,
+  BarChart2,
+  Table as TableIcon,
   Edit,
+  Save,
 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, addDays } from "date-fns";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
-import { constructionData } from "./data";
 
 type Task = {
   id: string;
@@ -65,27 +86,29 @@ type Task = {
   pdf_url?: string;
 };
 
+type ChartData = {
+  name: string;
+  value: number;
+  fill?: string;
+};
+
+type TaskWithId = Omit<Task, 'id'> & { id?: string };
+
 export default function ConstructionSchedulingPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMainCategory, setSelectedMainCategory] = useState<string>("");
   const [selectedSubCategory, setSelectedSubCategory] = useState<string>("");
-  const [selectedTask, setSelectedTask] = useState<string>("");
-  const [newTask, setNewTask] = useState<Omit<Task, "id">>({
-    mainCategory: "",
-    subCategory: "",
-    task: "",
-    duration: 1,
-    startDate: format(new Date(), "yyyy-MM-dd"),
-    finishDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
-    status: "pending",
-    remarks: "",
-  });
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [tasksInProgress, setTasksInProgress] = useState<Array<Task>>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [activeTaskIndex, setActiveTaskIndex] = useState<number | null>(null);
   const [showGeneratedPDFs, setShowGeneratedPDFs] = useState(false);
   const [selectedPdf, setSelectedPdf] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: "100%", height: "600px" });
+  const [activeView, setActiveView] = useState<"chart" | "table">("chart");
 
   // Load initial data
   useEffect(() => {
@@ -145,75 +168,163 @@ export default function ConstructionSchedulingPage() {
   const handleMainCategoryChange = (value: string) => {
     setSelectedMainCategory(value);
     setSelectedSubCategory("");
-    setSelectedTask("");
-    setNewTask({
-      ...newTask,
-      mainCategory: value,
-      subCategory: "",
-      task: "",
-    });
+    setSelectedTasks([]);
   };
 
   // Handle sub-category selection
   const handleSubCategoryChange = (value: string) => {
     setSelectedSubCategory(value);
-    setSelectedTask("");
-    setNewTask({
-      ...newTask,
-      subCategory: value,
-      task: "",
-    });
+    setSelectedTasks([]);
   };
 
-  // Handle task selection from list
-  const handleTaskSelect = (taskName: string) => {
-    setSelectedTask(taskName);
-    setNewTask({
-      ...newTask,
-      task: taskName,
-      startDate: format(new Date(), "yyyy-MM-dd"),
-      finishDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
-    });
+  // Toggle task selection
+  const toggleTaskSelection = (taskName: string) => {
+    setSelectedTasks(prev => 
+      prev.includes(taskName)
+        ? prev.filter(t => t !== taskName)
+        : [...prev, taskName]
+    );
   };
 
-  // Add new task to schedule
-  const addTask = () => {
-    if (!newTask.task || !newTask.startDate) {
+  // Add selected tasks to in-progress list
+  const addSelectedTasks = () => {
+    if (selectedTasks.length === 0) {
       toast({
-        title: "Error",
-        description: "Task name and start date are required",
+        title: "No tasks selected",
+        description: "Please select at least one task to add",
         variant: "destructive",
       });
       return;
     }
 
-    // Calculate finish date if duration changes
-    const finishDate = newTask.duration
-      ? format(
-          addDays(new Date(newTask.startDate), newTask.duration),
-          "yyyy-MM-dd"
-        )
-      : newTask.finishDate;
+    const newTasks: Task[] = selectedTasks.map(taskName => ({
+      id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      mainCategory: selectedMainCategory,
+      subCategory: selectedSubCategory || undefined,
+      task: taskName,
+      duration: 1,
+      startDate: format(new Date(), "yyyy-MM-dd"),
+      finishDate: format(addDays(new Date(), 1), "yyyy-MM-dd"),
+      status: "pending" as const,
+      remarks: "",
+    }));
 
-    const task: Task = {
-      id: `task_${Date.now()}`,
-      mainCategory: newTask.mainCategory,
-      subCategory: newTask.subCategory,
-      task: newTask.task,
-      duration: newTask.duration,
-      startDate: newTask.startDate,
-      finishDate,
-      status: newTask.status,
-      remarks: newTask.remarks,
-    };
-
-    setTasks([...tasks, task]);
-    setSelectedTask("");
+    setTasksInProgress(prev => [...prev, ...newTasks]);
+    setSelectedTasks([]);
+    
     toast({
-      title: "Success",
-      description: "Task added to schedule",
+      title: "Tasks added",
+      description: `${newTasks.length} task(s) added to your schedule`,
     });
   };
+
+  // Update a task in the in-progress list
+  const updateTaskInProgress = (id: string, updates: Partial<Omit<Task, 'id'>>) => {
+    setTasksInProgress(prev =>
+      prev.map(task =>
+        task.id === id ? { ...task, ...updates } : task
+      )
+    );
+  };
+
+  // Save tasks to the main list
+  const saveTasks = () => {
+    if (tasksInProgress.length === 0) {
+      toast({
+        title: "No tasks to save",
+        description: "Please add tasks to your schedule first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTasks(prev => [...prev, ...tasksInProgress]);
+    setTasksInProgress([]);
+    setSelectedMainCategory("");
+    setSelectedSubCategory("");
+    
+    toast({
+      title: "Tasks saved",
+      description: `${tasksInProgress.length} task(s) added to your schedule`,
+    });
+  };
+
+  // State for date filter
+  const [showAllTasks, setShowAllTasks] = useState(false);
+  // Get current date in YYYY-MM-DD format for filtering
+  const currentDate = format(new Date(), 'yyyy-MM-dd');
+
+  // Prepare data for charts
+  const chartData = useMemo(() => {
+    const allTasks = [...tasks, ...tasksInProgress];
+    
+    // Filter tasks for current day
+    const todaysTasks = allTasks.filter(task => 
+      task.startDate === currentDate
+    );
+    
+    // Use filtered tasks based on showAllTasks state
+    const tasksToShow = showAllTasks ? allTasks : todaysTasks;
+    
+    // Return empty state if no tasks
+    if (tasksToShow.length === 0) {
+      return { 
+        statusData: [], 
+        durationData: [], 
+        isEmpty: true, 
+        isFiltered: !showAllTasks, 
+        currentDate 
+      };
+    }
+
+    // Status distribution data
+    const statusCounts = tasksToShow.reduce((acc, task) => {
+      acc[task.status] = (acc[task.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const statusData = [
+      { name: 'Pending', value: statusCounts['pending'] || 0, color: '#f97316' },
+      { name: 'Completed', value: statusCounts['completed'] || 0, color: '#10b981' },
+    ];
+
+    // Top 5 tasks by duration
+    const durationData = [...tasksToShow]
+      .sort((a, b) => (b.duration || 0) - (a.duration || 0))
+      .slice(0, 5)
+      .map(task => ({
+        name: task.task.length > 15 ? `${task.task.substring(0, 15)}...` : task.task,
+        duration: task.duration || 1,
+        status: task.status,
+      }));
+
+    return { statusData, durationData, isEmpty: false, isFiltered: !showAllTasks, currentDate };
+  }, [tasks, tasksInProgress]);
+
+  // Calculate project timeline
+  const projectTimeline = useMemo(() => {
+    const allTasks = [...tasks, ...tasksInProgress];
+    if (allTasks.length === 0) return null;
+
+    const startDates = allTasks.map(task => new Date(task.startDate).getTime());
+    const endDates = allTasks.map(task => new Date(task.finishDate).getTime());
+    
+    const projectStart = new Date(Math.min(...startDates));
+    const projectEnd = new Date(Math.max(...endDates));
+    
+    const totalDays = differenceInDays(projectEnd, projectStart) + 1;
+    
+    if (isNaN(totalDays) || totalDays <= 0) return null;
+
+    return {
+      startDate: format(projectStart, 'MMM dd, yyyy'),
+      endDate: format(projectEnd, 'MMM dd, yyyy'),
+      totalDays,
+      completedTasks: allTasks.filter(t => t.status === 'completed').length,
+      totalTasks: allTasks.length,
+      completionRate: Math.round((allTasks.filter(t => t.status === 'completed').length / allTasks.length) * 100) || 0,
+    };
+  }, [tasks, tasksInProgress]);
 
   // Update task status
   const updateTaskStatus = (taskId: string, status: "completed" | "pending") => {
@@ -476,44 +587,68 @@ export default function ConstructionSchedulingPage() {
 {selectedMainCategory && (
   <Card className="mb-6">
     <CardHeader>
-      <CardTitle>Select Task</CardTitle>
+      <CardTitle>Select Tasks</CardTitle>
+      <p className="text-sm text-muted-foreground">
+        {selectedTasks.length} task(s) selected
+      </p>
     </CardHeader>
     <CardContent>
-      <div className="w-full">
-        <Select
-          onValueChange={(value) => handleTaskSelect(value)}
-          value={selectedTask || ""}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Choose a task" />
-          </SelectTrigger>
-          <SelectContent>
-            {(
-              selectedSubCategory
-                ? (
-                    (constructionData as Record<
-                      string,
-                      Record<string, string[]> | string[]
-                    >)[selectedMainCategory] as Record<string, string[]>
-                  )[selectedSubCategory] ?? []
-                : Array.isArray(
-                    (constructionData as Record<
-                      string,
-                      string[] | Record<string, string[]>
-                    >)[selectedMainCategory]
-                  )
-                ? ((constructionData as Record<
+      <ScrollArea className="h-64 rounded-md border p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+          {(
+            selectedSubCategory
+              ? (
+                  (constructionData as Record<
+                    string,
+                    Record<string, string[]> | string[]
+                  >)[selectedMainCategory] as Record<string, string[]>
+                )?.[selectedSubCategory] ?? []
+              : Array.isArray(
+                  (constructionData as Record<
                     string,
                     string[] | Record<string, string[]>
-                  >)[selectedMainCategory] as string[])
-                : []
-            )?.map((taskName: string) => (
-              <SelectItem key={taskName} value={taskName}>
-                {taskName}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                  >)[selectedMainCategory]
+                )
+              ? (constructionData[selectedMainCategory as keyof typeof constructionData] as string[])
+              : []
+          )?.map((taskName: string) => {
+            const isSelected = selectedTasks.includes(taskName);
+            return (
+              <Button
+                key={taskName}
+                variant={isSelected ? "default" : "outline"}
+                className={`h-auto min-h-[40px] py-2 justify-start text-left whitespace-normal ${isSelected ? 'bg-primary/10 border-primary' : ''}`}
+                onClick={() => toggleTaskSelection(taskName)}
+              >
+                <div className="flex items-center gap-2 w-full">
+                  {isSelected ? (
+                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-primary" />
+                  ) : (
+                    <div className="h-4 w-4 rounded-full border flex-shrink-0" />
+                  )}
+                  <span className="text-sm">{taskName}</span>
+                </div>
+              </Button>
+            );
+          })}
+        </div>
+      </ScrollArea>
+      
+      <div className="mt-4 flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={() => setSelectedTasks([])}
+          disabled={selectedTasks.length === 0}
+        >
+          Clear Selection
+        </Button>
+        <Button
+          onClick={addSelectedTasks}
+          disabled={selectedTasks.length === 0}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add Selected Tasks
+        </Button>
       </div>
     </CardContent>
   </Card>
@@ -521,119 +656,146 @@ export default function ConstructionSchedulingPage() {
 
 
 
-        {/* Task Details Form */}
-        {selectedTask && (
+        {/* Tasks in Progress */}
+        {tasksInProgress.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Schedule Task</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Tasks in Progress</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {tasksInProgress.length} task(s) to be scheduled
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Task Name</Label>
-                  <Input value={selectedTask} readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label>Duration (days)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={newTask.duration}
-                    onChange={(e) => {
-                      const duration = parseInt(e.target.value) || 1;
-                      setNewTask({
-                        ...newTask,
-                        duration,
-                        finishDate: format(
-                          addDays(
-                            new Date(newTask.startDate),
-                            duration
-                          ),
-                          "yyyy-MM-dd"
-                        ),
-                      });
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <div className="relative">
-                    <Input
-                      type="date"
-                      value={newTask.startDate}
-                      onChange={(e) => {
-                        setNewTask({
-                          ...newTask,
-                          startDate: e.target.value,
-                          finishDate: format(
-                            addDays(
-                              new Date(e.target.value),
-                              newTask.duration
-                            ),
-                            "yyyy-MM-dd"
-                          ),
-                        });
-                      }}
-                    />
-                    <CalendarIcon className="absolute right-3 top-3 h-4 w-4 opacity-50" />
+              <div className="space-y-6">
+                {tasksInProgress.map((task, index) => (
+                  <div key={task.id} className="border rounded-lg p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">{task.task}</h4>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setTasksInProgress(prev => 
+                            prev.filter((_, i) => i !== index)
+                          );
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label>Duration (days)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={task.duration}
+                          onChange={(e) => {
+                            const duration = parseInt(e.target.value) || 1;
+                            updateTaskInProgress(task.id, {
+                              duration,
+                              finishDate: format(
+                                addDays(new Date(task.startDate), duration),
+                                "yyyy-MM-dd"
+                              )
+                            });
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Start Date</Label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={task.startDate}
+                            onChange={(e) => {
+                              const startDate = e.target.value;
+                              updateTaskInProgress(task.id, {
+                                startDate,
+                                finishDate: format(
+                                  addDays(new Date(startDate), task.duration),
+                                  "yyyy-MM-dd"
+                                )
+                              });
+                            }}
+                          />
+                          <CalendarIcon className="absolute right-3 top-3 h-4 w-4 opacity-50" />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Finish Date</Label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            value={task.finishDate}
+                            onChange={(e) => {
+                              const finishDate = e.target.value;
+                              const startDate = new Date(task.startDate);
+                              const endDate = new Date(finishDate);
+                              const duration = Math.ceil(
+                                (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+                              ) || 1;
+                              
+                              updateTaskInProgress(task.id, {
+                                finishDate,
+                                duration
+                              });
+                            }}
+                          />
+                          <CalendarIcon className="absolute right-3 top-3 h-4 w-4 opacity-50" />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={task.status}
+                          onValueChange={(value: "completed" | "pending") => 
+                            updateTaskInProgress(task.id, { status: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="completed">Completed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Remarks</Label>
+                        <Textarea
+                          value={task.remarks || ""}
+                          onChange={(e) => 
+                            updateTaskInProgress(task.id, { remarks: e.target.value })
+                          }
+                          placeholder="Add any notes or details..."
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Finish Date</Label>
-                  <div className="relative">
-                    <Input
-                      type="date"
-                      value={newTask.finishDate}
-                      onChange={(e) => {
-                        const startDate = new Date(newTask.startDate);
-                        const finishDate = new Date(e.target.value);
-                        const duration = Math.ceil(
-                          (finishDate.getTime() - startDate.getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        setNewTask({
-                          ...newTask,
-                          finishDate: e.target.value,
-                          duration: duration > 0 ? duration : 1,
-                        });
-                      }}
-                    />
-                    <CalendarIcon className="absolute right-3 top-3 h-4 w-4 opacity-50" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    onValueChange={(value: "completed" | "pending") =>
-                      setNewTask({ ...newTask, status: value })
-                    }
-                    value={newTask.status}
+                ))}
+                
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setTasksInProgress([])}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    Cancel
+                  </Button>
+                  <Button onClick={saveTasks}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save All Tasks
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Remarks</Label>
-                  <Textarea
-                    value={newTask.remarks}
-                    onChange={(e) =>
-                      setNewTask({ ...newTask, remarks: e.target.value })
-                    }
-                    placeholder="Any additional notes..."
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Button onClick={addTask}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add to Schedule
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -649,11 +811,12 @@ export default function ConstructionSchedulingPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="w-full">
-              <div className="min-w-[1000px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
+            <div className="relative overflow-x-auto">
+              <ScrollArea className="w-full">
+                <div className="min-w-[1000px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
                       <TableHead>Main Category</TableHead>
                       <TableHead>Sub-Category</TableHead>
                       <TableHead>Task</TableHead>
@@ -742,6 +905,7 @@ export default function ConstructionSchedulingPage() {
                 </Table>
               </div>
             </ScrollArea>
+            </div>
           </CardContent>
         </Card>
 
@@ -847,6 +1011,233 @@ export default function ConstructionSchedulingPage() {
             </Card>
           </div>
         )}
+      </div>
+
+{/* Visual Summary Preview Modal */}
+<Dialog open={showPreview} onOpenChange={setShowPreview}>
+  <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
+    <DialogHeader>
+      <div className="flex justify-between items-center">
+        <DialogTitle>Project Summary</DialogTitle>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">
+            {chartData.isFiltered
+              ? `Showing tasks for ${format(new Date(chartData.currentDate), 'MMMM d, yyyy')}`
+              : 'Showing all tasks'}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowAllTasks(!showAllTasks)}
+            className="ml-2"
+          >
+            {showAllTasks ? "Show Today's Tasks" : 'Show All Tasks'}
+          </Button>
+        </div>
+      </div>
+    </DialogHeader>
+
+    <div className="flex-1 overflow-hidden">
+      {chartData.isEmpty ? (
+        <div className="h-full flex flex-col items-center justify-center text-center p-8">
+          <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-1">
+            {showAllTasks ? 'No tasks found' : 'No tasks scheduled for today'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {showAllTasks
+              ? 'Add tasks to see them in the summary.'
+              : 'Tasks for other days are not shown. Use "Show All Tasks" to view all tasks.'}
+          </p>
+          <Button onClick={() => setShowAllTasks(!showAllTasks)} variant="outline">
+            {showAllTasks ? "Show Today's Tasks" : 'Show All Tasks'}
+          </Button>
+        </div>
+      ) : (
+        <Tabs
+          value={activeView}
+          onValueChange={(value) => setActiveView(value as 'chart' | 'table')}
+          className="h-full flex flex-col"
+        >
+          <TabsList className="grid w-full grid-cols-2 max-w-xs mx-auto mb-4">
+            <TabsTrigger value="chart">
+              <BarChart2 className="w-4 h-4 mr-2" />
+              Charts
+            </TabsTrigger>
+            <TabsTrigger value="table">
+              <TableIcon className="w-4 h-4 mr-2" />
+              Task List
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="chart" className="flex-1 overflow-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {projectTimeline && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Project Timeline</CardTitle>
+                    <CardDescription>
+                      {projectTimeline.startDate} - {projectTimeline.endDate}
+                      <span className="block text-sm text-muted-foreground mt-1">
+                        {projectTimeline.totalDays} days total • {projectTimeline.completedTasks} of {projectTimeline.totalTasks} tasks completed
+                      </span>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-4 w-full bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-500"
+                        style={{ width: `${projectTimeline.completionRate}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2 text-right">
+                      {projectTimeline.completionRate}% Complete
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Task Status</CardTitle>
+                </CardHeader>
+                <CardContent className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.statusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                        label={({ name, percent }) =>
+                          `${name}: ${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {chartData.statusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                        <LabelList dataKey="value" position="inside" fill="#fff" style={{ fontSize: '12px' }} />
+                      </Pie>
+                      <Tooltip formatter={(value: number) => [`${value} tasks`, 'Count']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Task Duration (Top 5 by Days)</CardTitle>
+                </CardHeader>
+                <CardContent className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData.durationData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="name"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <YAxis />
+                      <Tooltip formatter={(value: number) => [`${value} days`, 'Duration']} />
+                      <Legend />
+                      <Bar
+                        dataKey="duration"
+                        name="Duration (days)"
+                        fill="#8884d8"
+                        radius={[4, 4, 0, 0]}
+                      >
+                        <LabelList dataKey="duration" position="top" fill="#8884d8" />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="table" className="flex-1 overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Task</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>Finish Date</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...tasks, ...tasksInProgress]
+                  .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+                  .map((task) => (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-medium">{task.task}</TableCell>
+                      <TableCell>{task.duration} days</TableCell>
+                      <TableCell>{format(new Date(task.startDate), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>{format(new Date(task.finishDate), 'MMM dd, yyyy')}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            task.status === 'completed'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+              </TableBody>
+            </Table>
+          </TabsContent>
+        </Tabs>
+      )}
+    </div>
+
+    {/* Close Button */}
+    <div className="flex justify-end pt-4 border-t">
+      <Button onClick={() => setShowPreview(false)}>Close</Button>
+    </div>
+  </DialogContent>
+</Dialog>
+
+{/* Preview Trigger Button */}
+<div className="fixed bottom-6 right-6 z-10">
+  <Button
+    onClick={() => setShowPreview(true)}
+    className="rounded-full w-12 h-12 p-0 shadow-lg"
+    size="icon"
+    variant="default"
+    disabled={tasks.length === 0 && tasksInProgress.length === 0}
+  >
+    <BarChart2 className="w-5 h-5" />
+    <span className="sr-only">View Summary</span>
+  </Button>
+</div>
+
+      
+      {/* Preview Button - Fixed at bottom right */}
+      <div className="fixed bottom-6 right-6 z-10">
+        <Button 
+          onClick={() => setShowPreview(true)}
+          className="rounded-full w-12 h-12 p-0 shadow-lg"
+          size="icon"
+          variant="default"
+          disabled={tasks.length === 0 && tasksInProgress.length === 0}
+        >
+          <BarChart2 className="w-5 h-5" />
+          <span className="sr-only">View Summary</span>
+        </Button>
       </div>
     </DashboardLayout>
   );
