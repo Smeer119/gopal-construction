@@ -434,30 +434,32 @@ export default function ConstructionSchedulingPage() {
             </Select>
           </div>
 
-          {selectedMainCategory &&
-            typeof constructionData[selectedMainCategory] === "object" &&
-            !Array.isArray(constructionData[selectedMainCategory]) && (
-              <div className="space-y-2">
-                <Label>Sub-Category</Label>
-                <Select
-                  onValueChange={handleSubCategoryChange}
-                  value={selectedSubCategory}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select sub-category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(constructionData[selectedMainCategory]).map(
-                      (subCategory) => (
-                        <SelectItem key={subCategory} value={subCategory}>
-                          {subCategory}
-                        </SelectItem>
-                      )
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+         {selectedMainCategory &&
+  selectedMainCategory in constructionData &&
+  typeof constructionData[selectedMainCategory as keyof typeof constructionData] === "object" &&
+  !Array.isArray(constructionData[selectedMainCategory as keyof typeof constructionData]) && (
+    <div className="space-y-2">
+      <Label>Sub-Category</Label>
+      <Select
+        onValueChange={handleSubCategoryChange}
+        value={selectedSubCategory}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Select sub-category" />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.keys(
+            constructionData[selectedMainCategory as keyof typeof constructionData]
+          ).map((subCategory) => (
+            <SelectItem key={subCategory} value={subCategory}>
+              {subCategory}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+)}
+
 
           <div className="flex items-end">
             <Button
@@ -470,39 +472,54 @@ export default function ConstructionSchedulingPage() {
             </Button>
           </div>
         </div>
-        {/* Task Selection */}
+      {/* Task Selection */}
+{selectedMainCategory && (
+  <Card className="mb-6">
+    <CardHeader>
+      <CardTitle>Select Task</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="w-full">
+        <Select
+          onValueChange={(value) => handleTaskSelect(value)}
+          value={selectedTask || ""}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Choose a task" />
+          </SelectTrigger>
+          <SelectContent>
+            {(
+              selectedSubCategory
+                ? (
+                    (constructionData as Record<
+                      string,
+                      Record<string, string[]> | string[]
+                    >)[selectedMainCategory] as Record<string, string[]>
+                  )[selectedSubCategory] ?? []
+                : Array.isArray(
+                    (constructionData as Record<
+                      string,
+                      string[] | Record<string, string[]>
+                    >)[selectedMainCategory]
+                  )
+                ? ((constructionData as Record<
+                    string,
+                    string[] | Record<string, string[]>
+                  >)[selectedMainCategory] as string[])
+                : []
+            )?.map((taskName: string) => (
+              <SelectItem key={taskName} value={taskName}>
+                {taskName}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </CardContent>
+  </Card>
+)}
 
-        {selectedMainCategory && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle>Select Task</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="w-full">
-                <Select
-                  onValueChange={(value) => handleTaskSelect(value)}
-                  value={selectedTask || ""}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose a task" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(selectedSubCategory
-                      ? constructionData[selectedMainCategory]?.[selectedSubCategory]
-                      : Array.isArray(constructionData[selectedMainCategory])
-                      ? constructionData[selectedMainCategory]
-                      : []
-                    )?.map((taskName: string) => (
-                      <SelectItem key={taskName} value={taskName}>
-                        {taskName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+
 
         {/* Task Details Form */}
         {selectedTask && (
