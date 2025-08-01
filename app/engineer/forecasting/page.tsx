@@ -340,7 +340,8 @@ export default function ConstructionChecklistPage() {
       });
 
       // Add signature placeholders
-      const lastPageHeight = doc.lastAutoTable.finalY || 100;
+      const lastPageHeight = doc.lastAutoTable?.finalY ?? 100;
+
       const signatureY = Math.max(lastPageHeight + 20, 180);
       
       doc.setFontSize(12);
