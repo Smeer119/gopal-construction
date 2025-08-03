@@ -1,5 +1,9 @@
-// Define your construction data structure
-export const constructionData = {
+// data.ts
+export type ConstructionData = {
+  [mainTopic: string]: string[] | { [subTopic: string]: string[] };
+};
+
+export const constructionData: ConstructionData = {
   "Pre-Pour Checklist": {
     "Drawing & Documentation Approvals": [
       "Latest approved drawing available on-site",
@@ -25,10 +29,10 @@ export const constructionData = {
     "Centerline",
     "All Levels",
     "Formwork/Supports",
-    "Reinforcement (L/\u00d8/)",
+    "Reinforcement (L/Ø/)",
     "Embedded Items",
     "Concrete Grade",
-    "Slump & Cube Cast",
+    "Slump Test and Cube Casting",
     "Curing"
   ],
   "Beam Pour Checklist": [
@@ -39,8 +43,7 @@ export const constructionData = {
     "Conduits and sleeves placed",
     "Shuttering oil applied",
     "Concrete grade confirmed",
-    "Slump test",
-    "Cube sample taken",
+    "Slump Test and Cube Casting",
     "Proper vibration during pour",
     "Curing method available"
   ],
@@ -53,7 +56,7 @@ export const constructionData = {
     "Shuttering oil applied",
     "Stability of formwork",
     "Concrete grade",
-    "Slump test",
+    "Slump Test and Cube Casting",
     "Cube sample",
     "Proper vibration",
     "Curing arrangements"
@@ -66,8 +69,7 @@ export const constructionData = {
     "Conduits & sleeves",
     "Expansion joints & inserts",
     "Concrete grade",
-    "Slump test",
-    "Cube cast",
+    "Slump Test and Cube Casting",
     "Pour sequence planning",
     "Vibration and surface levelling",
     "Curing arrangements"
@@ -80,8 +82,7 @@ export const constructionData = {
     "Conduits and sleeves if any",
     "Shuttering oil",
     "Concrete grade",
-    "Slump test",
-    "Cube sample",
+    "Slump Test and Cube Casting",
     "Pouring sequence",
     "Vibration and levelling",
     "Curing"
@@ -93,10 +94,25 @@ export const constructionData = {
     "Openings and sleeves",
     "Shuttering oil",
     "Concrete grade",
-    "Slump test",
-    "Cube casting",
+    "Slump Test and Cube Casting",
     "Pouring in layers",
     "Vibration",
     "Curing"
   ]
+};
+
+export function validateConstructionData(data: ConstructionData): boolean {
+  return Object.values(data).every((value) => {
+    if (Array.isArray(value)) {
+      return value.length > 0 && value.every((task) => typeof task === "string" && task.length > 0);
+    } else if (typeof value === "object" && value !== null) {
+      return Object.values(value).every(
+        (subValue) =>
+          Array.isArray(subValue) &&
+          subValue.length > 0 &&
+          subValue.every((task) => typeof task === "string" && task.length > 0)
+      );
+    }
+    return false;
+  });
 }
