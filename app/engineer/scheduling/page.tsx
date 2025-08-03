@@ -803,7 +803,7 @@ export default function ConstructionSchedulingPage() {
 
         {/* Scheduled Tasks Table */}
         <Card>
-          <CardHeader className="flex flex-row justify-between items-center">
+          <CardHeader className="flex flex-row justify-between items-center ">
             <CardTitle>Scheduled Tasks</CardTitle>
             <Button onClick={generatePDF} disabled={tasks.length === 0 || loading}>
               <Download className="w-4 h-4 mr-2" />
@@ -812,9 +812,9 @@ export default function ConstructionSchedulingPage() {
           </CardHeader>
           <CardContent>
             <div className="relative overflow-x-auto">
-              <ScrollArea className="w-full">
+             <div className="overflow-auto max-h-[500px]">
                 <div className="min-w-[1000px]">
-                  <Table>
+                  <Table >
                     <TableHeader>
                       <TableRow>
                       <TableHead>Main Category</TableHead>
@@ -904,7 +904,8 @@ export default function ConstructionSchedulingPage() {
                   </TableBody>
                 </Table>
               </div>
-            </ScrollArea>
+              
+         </div>
             </div>
           </CardContent>
         </Card>

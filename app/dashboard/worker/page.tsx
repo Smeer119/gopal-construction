@@ -781,7 +781,7 @@ export default function WorkerAttendancePage() {
         {/* Attendance Table */}
         <Card>
           <CardContent className="p-0">
-            <ScrollArea className="h-[500px] w-full">
+       <div className="overflow-auto max-h-[500px]">
               <div className="min-w-[800px] overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
@@ -960,7 +960,7 @@ export default function WorkerAttendancePage() {
                   </TableBody>
                 </Table>
               </div>
-            </ScrollArea>
+          </div>
           </CardContent>
         </Card>
 
