@@ -252,8 +252,14 @@ export default function ConstructionChecklistPage() {
       doc.save(`pourcard_${pdfDate}.pdf`);
       toast({ title: "Success", description: "PDF generated and saved to Supabase", variant: "default" });
     } catch (err) {
-      toast({ title: "Error", description: `Failed to generate or save PDF: ${err.message}`, variant: "destructive" });
-    }
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  toast({
+    title: "Error",
+    description: `Failed to generate or save PDF: ${errorMessage}`,
+    variant: "destructive"
+  });
+}
+
   };
 
   if (loading) {
