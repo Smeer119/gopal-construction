@@ -247,7 +247,7 @@ export default function Home() {
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  className="w-full sm:w-auto px-8 py-4 text-lg border-white text-white hover:bg-white/10 hover:text-white"
+                  className="w-full sm:w-auto px-8 py-4 text-lg border-white text-whit bg-white/10 text-white"
                 >
                   Sign In
                 </Button>
