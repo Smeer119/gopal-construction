@@ -16,8 +16,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+// ✅ DO THIS at the top of page.tsx
+import { MaterialRequirementSection, MaterialRequirement } from './components/MaterialRequirement'
+
+
+
 function App() {
   const [showPreview, setShowPreview] = useState(false)
+  const supabase = createClientComponentClient()
   
   // Basic report information
   const [siteName, setSiteName] = useState('Construction Site Alpha')
@@ -63,7 +70,7 @@ function App() {
     }
   }, [])
 
-  const saveData = () => {
+  const saveData = async () => {
     const data = {
       siteName,
       date,
@@ -80,6 +87,24 @@ function App() {
       materialTests
     }
     localStorage.setItem('dpr-data', JSON.stringify(data))
+    
+    // Also save to Supabase if user is authenticated
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { error } = await supabase
+          .from('dpr_drafts')
+          .upsert({
+            user_id: user.id,
+            report_data: data,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' })
+
+        if (error) throw error
+      }
+    } catch (error) {
+      console.error('Error saving to Supabase:', error)
+    }
     
     // Visual feedback
     const button = document.getElementById('save-button')
@@ -201,198 +226,236 @@ function App() {
     setMaterialTests(materialTests.filter(t => t.id !== id))
   }
 
-  const reportData = {
-    siteName,
-    date,
-    weather,
-    temperature,
-    contractors,
-    labours,
-    equipment,
-    visitors,
-    issues,
-    todayWork,
-    tomorrowWork,
-    expensesData,
-    materialTests
+  // material requirement handlers
+
+
+  const [requirements, setRequirements] = useState<MaterialRequirement[]>([])
+
+const addRequirement = (requirement: Omit<MaterialRequirement, 'id'>) => {
+  const newRequirement = {
+    id: Date.now().toString(), // or use uuid
+    ...requirement,
   }
+  setRequirements((prev) => [...prev, newRequirement])
+}
+
+const updateRequirement = (id: string, updated: Partial<MaterialRequirement>) => {
+  setRequirements((prev) =>
+    prev.map((req) => (req.id === id ? { ...req, ...updated } : req))
+  )
+}
+
+const deleteRequirement = (id: string) => {
+  setRequirements((prev) => prev.filter((req) => req.id !== id))
+}
+
+
+const reportData = {
+  siteName,
+  date,
+  weather,
+  temperature,
+  contractors,
+  labours,
+  equipment,
+  visitors,
+  issues,
+  todayWork,
+  tomorrowWork,
+  expensesData,
+  materialTests,
+
+   materialRequirements: [] 
+};
+
+
 
   return (
-
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="container mx-auto px-4 py-8 max-w-6xl min-h-screen">
         {!showPreview ? (
           <>
-        {/* Header */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8 w-full">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="bg-blue-100 p-3 rounded-lg">
-              <Construction className="w-8 h-8 text-blue-600" />
-            </div>
-            
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Daily Progress Report</h1>
-              <p className="text-gray-600">Construction Site Management System</p>
-            </div>
-              <Link href="/dashboard/engineer">
-                        <Button variant="outline">
-                          <ArrowLeft className="w-4 h-4 mr-2" />
-                          Back to Dashboard
-                        </Button>
-                      </Link>
-          </div>
+            {/* Header */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8 w-full">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="bg-blue-100 p-3 rounded-lg">
+                  <Construction className="w-8 h-8 text-blue-600" />
+                </div>
+                
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-800">Daily Progress Report</h1>
+                  <p className="text-gray-600">Construction Site Management System</p>
+                </div>
+                <Link href="/dashboard/engineer">
+                  <Button variant="outline">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
+                </Link>
+              </div>
 
-          {/* Basic Information Form */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <FileText className="w-4 h-4 inline mr-1" />
-                Site Name
-              </label>
-              <input
-                type="text"
-                value={siteName}
-                onChange={(e) => setSiteName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter site name"
+              {/* Basic Information Form */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <FileText className="w-4 h-4 inline mr-1" />
+                    Site Name
+                  </label>
+                  <input
+                    type="text"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter site name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Cloud className="w-4 h-4 inline mr-1" />
+                    Weather
+                  </label>
+                  <select
+                    value={weather}
+                    onChange={(e) => setWeather(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="Sunny">Sunny</option>
+                    <option value="Cloudy">Cloudy</option>
+                    <option value="Rainy">Rainy</option>
+                    <option value="Stormy">Stormy</option>
+                    <option value="Windy">Windy</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Thermometer className="w-4 h-4 inline mr-1" />
+                    Temperature
+                  </label>
+                  <input
+                    type="text"
+                    value={temperature}
+                    onChange={(e) => setTemperature(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g., 25°C"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content Sections */}
+            <div className="space-y-6 w-full">
+              <ContractorSection
+                contractors={contractors}
+                onAddContractor={addContractor}
+                onUpdateContractor={updateContractor}
+                onDeleteContractor={deleteContractor}
               />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Calendar className="w-4 h-4 inline mr-1" />
-                Date
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+
+              <DepartmentLabourSection
+                labours={labours}
+                onUpdateLabours={updateLabours}
               />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Cloud className="w-4 h-4 inline mr-1" />
-                Weather
-              </label>
-              <select
-                value={weather}
-                onChange={(e) => setWeather(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="Sunny">Sunny</option>
-                <option value="Cloudy">Cloudy</option>
-                <option value="Rainy">Rainy</option>
-                <option value="Stormy">Stormy</option>
-                <option value="Windy">Windy</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                <Thermometer className="w-4 h-4 inline mr-1" />
-                Temperature
-              </label>
-              <input
-                type="text"
-                value={temperature}
-                onChange={(e) => setTemperature(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="e.g., 25°C"
+                 <VisitorSection
+                visitors={visitors}
+                onAddVisitor={addVisitor}
+                onUpdateVisitor={updateVisitor}
+                onDeleteVisitor={deleteVisitor}
               />
+
+              <EquipmentSection
+                equipment={equipment}
+                onAddEquipment={addEquipment}
+                onUpdateEquipment={updateEquipment}
+                onDeleteEquipment={deleteEquipment}
+              />
+   <TomorrowWorkSection
+                tomorrowWork={tomorrowWork}
+                onAddTomorrowWork={addTomorrowWork}
+                onUpdateTomorrowWork={updateTomorrowWork}
+                onDeleteTomorrowWork={deleteTomorrowWork}
+              />
+           
+           <MaterialRequirementSection
+  requirements={requirements}
+  onAddRequirement={addRequirement}
+  onUpdateRequirement={updateRequirement}
+  onDeleteRequirement={deleteRequirement}
+/>
+
+
+                <MaterialTestingSection
+                materialTests={materialTests}
+                onAddMaterialTest={addMaterialTest}
+                onUpdateMaterialTest={updateMaterialTest}
+                onDeleteMaterialTest={deleteMaterialTest}
+              /> 
+
+
+              <CriticalIssuesSection
+                issues={issues}
+                onAddIssue={addIssue}
+                onUpdateIssue={updateIssue}
+                onDeleteIssue={deleteIssue}
+              />
+
+              <TodayWorkSection
+                todayWork={todayWork}
+                onAddTodayWork={addTodayWork}
+                onUpdateTodayWork={updateTodayWork}
+                onDeleteTodayWork={deleteTodayWork}
+              />
+
+           
+
+              <ExpensesSection
+                expensesData={expensesData}
+                onUpdateExpenses={updateExpensesData}
+              />
+
+            
             </div>
-          </div>
 
-        </div>
-
-        {/* Main Content Sections */}
-        <div className="space-y-6 w-full">
-          <ContractorSection
-            contractors={contractors}
-            onAddContractor={addContractor}
-            onUpdateContractor={updateContractor}
-            onDeleteContractor={deleteContractor}
-          />
-
-          <DepartmentLabourSection
-            labours={labours}
-            onUpdateLabours={updateLabours}
-          />
-
-          <EquipmentSection
-            equipment={equipment}
-            onAddEquipment={addEquipment}
-            onUpdateEquipment={updateEquipment}
-            onDeleteEquipment={deleteEquipment}
-          />
-
-          <VisitorSection
-            visitors={visitors}
-            onAddVisitor={addVisitor}
-            onUpdateVisitor={updateVisitor}
-            onDeleteVisitor={deleteVisitor}
-          />
-
-          <CriticalIssuesSection
-            issues={issues}
-            onAddIssue={addIssue}
-            onUpdateIssue={updateIssue}
-            onDeleteIssue={deleteIssue}
-          />
-
-          <TodayWorkSection
-            todayWork={todayWork}
-            onAddTodayWork={addTodayWork}
-            onUpdateTodayWork={updateTodayWork}
-            onDeleteTodayWork={deleteTodayWork}
-          />
-
-          <TomorrowWorkSection
-            tomorrowWork={tomorrowWork}
-            onAddTomorrowWork={addTomorrowWork}
-            onUpdateTomorrowWork={updateTomorrowWork}
-            onDeleteTomorrowWork={deleteTomorrowWork}
-          />
-
-          <ExpensesSection
-            expensesData={expensesData}
-            onUpdateExpenses={updateExpensesData}
-          />
-
-          <MaterialTestingSection
-            materialTests={materialTests}
-            onAddMaterialTest={addMaterialTest}
-            onUpdateMaterialTest={updateMaterialTest}
-            onDeleteMaterialTest={deleteMaterialTest}
-          />
-        </div>
-
-        {/* Action Buttons at Bottom */}
-        <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Report Actions</h3>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <button
-              id="save-button"
-              onClick={saveData}
-              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              <Save className="w-5 h-5" />
-              Save Progress
-            </button>
-            <button
-              onClick={() => setShowPreview(true)}
-              className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-            >
-              <Eye className="w-5 h-5" />
-              Preview Report
-            </button>
-          </div>
-        </div>
-        {/* Footer */}
-        <div className="mt-12 text-center text-gray-500 text-sm pb-8">
-          <p>DPR Management System - Built for Construction Excellence</p>
-        </div>
+            {/* Action Buttons at Bottom */}
+            <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Report Actions</h3>
+              <div className="flex flex-wrap gap-4 justify-center">
+                <button
+                  id="save-button"
+                  onClick={saveData}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  <Save className="w-5 h-5" />
+                  Save Progress
+                </button>
+                <button
+                  onClick={() => setShowPreview(true)}
+                  className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                >
+                  <Eye className="w-5 h-5" />
+                  Preview Report
+                </button>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="mt-12 text-center text-gray-500 text-sm pb-8">
+              <p>DPR Management System - Built for Construction Excellence</p>
+            </div>
           </>
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 w-full min-h-screen">

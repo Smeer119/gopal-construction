@@ -27,7 +27,7 @@ interface DepartmentLabourSectionProps {
 }
 
 const genderOptions = ['Male', 'Female']
-const skilledWorkerTypes = ['Painter', 'Mason', 'Tiling', 'Welding', 'Electrical', 'Plumbing', 'Carpentry', 'Steel Fixing']
+const skilledWorkerTypes = ['Carpenter', 'Filter', 'Monson', 'Tiling', 'Plaster', 'Curing', 'Shifting', 'Cleaning','Roofing', 'Fabrication', 'Electrical', 'Plumbing', 'Other',]
 
 export const DepartmentLabourSection: React.FC<DepartmentLabourSectionProps> = ({
   labours,

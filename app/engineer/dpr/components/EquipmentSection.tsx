@@ -19,10 +19,28 @@ interface EquipmentSectionProps {
 }
 
 const machineTypes = [
-  'Concrete Mixer', 'JCB Excavator', 'Tower Crane', 'Mobile Crane', 'Bulldozer',
-  'Dumper Truck', 'Concrete Pump', 'Roller Compactor', 'Grader', 'Backhoe Loader',
-  'Forklift', 'Welding Machine', 'Cutting Machine', 'Drilling Machine'
-]
+  'Concrete Mixer',
+  'Poclain Bucket',
+  'Poclain Breaker',
+  'JCB/ Excavator',
+  'Truck/HYVA/Dumper',
+  'Crane',
+  'Tractor',
+  'Compactor',
+  'Breaker',
+  'Core Cutter',
+  'Generator',
+  'Vibro/Drum Roller',
+  'Pickup/Camper',
+  'Wheel Loader',
+  'Ajax',
+  'Boom Pump/Placer',
+  'Asphalt Pavers',
+  'Cold Planners',
+  'Motor Graders',
+  'Forklift',
+  'Others'
+];
 
 export const EquipmentSection: React.FC<EquipmentSectionProps> = ({
   equipment,
