@@ -252,19 +252,20 @@ export default function ConstructionChecklistPage() {
       doc.save(`pourcard_${pdfDate}.pdf`);
       toast({ title: "Success", description: "PDF generated and saved to Supabase", variant: "default" });
     } catch (err) {
-  const errorMessage = err instanceof Error ? err.message : String(err);
-  toast({
-    title: "Error",
-    description: `Failed to generate or save PDF: ${errorMessage}`,
-    variant: "destructive"
-  });
-}
+    toast({
+  title: "Error",
+  description: `Failed to generate or save PDF: ${
+    err instanceof Error ? err.message : String(err)
+  }`,
+  variant: "destructive",
+});
 
+    }
   };
 
   if (loading) {
     return (
-      <DashboardLayout role="worker">
+      <DashboardLayout role="engineer">
         <div className="p-4 flex justify-center items-center h-screen">
           <p>Loading...</p>
         </div>
@@ -273,7 +274,7 @@ export default function ConstructionChecklistPage() {
   }
 
   return (
-    <DashboardLayout role="worker">
+    <DashboardLayout role="engineer">
       <div className="p-4">
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -294,50 +295,54 @@ export default function ConstructionChecklistPage() {
           </div>
         </div>
 
-        {/* Selection UI */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Select Checklist Topic</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-              <div className="space-y-2">
-                <Label>Main Topic</Label>
-                <Select onValueChange={setTempMainTopic} value={tempMainTopic}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a main topic" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.keys(constructionData).map((topic) => (
-                      <SelectItem key={topic} value={topic}>
-                        {topic}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+    <Card className="mb-6">
+  <CardHeader>
+    <CardTitle>Select Checklist Topic</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end overflow-visible">
+      {/* Main Topic */}
+      <div className="space-y-2 relative">
+        <Label>Main Topic</Label>
+        <Select onValueChange={setTempMainTopic} value={tempMainTopic}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a main topic" />
+          </SelectTrigger>
+          <SelectContent className="z-50">
+            {Object.keys(constructionData).map((topic) => (
+              <SelectItem key={topic} value={topic}>
+                {topic}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-              {tempMainTopic &&
-                typeof constructionData[tempMainTopic] === "object" &&
-                !Array.isArray(constructionData[tempMainTopic]) && (
-                  <div className="space-y-2">
-                    <Label>Sub-Topic</Label>
-                    <Select onValueChange={setTempSubTopic} value={tempSubTopic}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a sub-topic" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(constructionData[tempMainTopic] as { [subTopic: string]: string[] }).map(
-                          (subTopic) => (
-                            <SelectItem key={subTopic} value={subTopic}>
-                              {subTopic}
-                            </SelectItem>
-                          )
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
+      {/* Sub-Topic */}
+      {tempMainTopic &&
+        typeof constructionData[tempMainTopic] === "object" &&
+        !Array.isArray(constructionData[tempMainTopic]) && (
+          <div className="space-y-2 relative">
+            <Label>Sub-Topic</Label>
+            <Select onValueChange={setTempSubTopic} value={tempSubTopic}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a sub-topic" />
+              </SelectTrigger>
+              <SelectContent className="z-50">
+                {Object.keys(constructionData[tempMainTopic] as { [subTopic: string]: string[] }).map(
+                  (subTopic) => (
+                    <SelectItem key={subTopic} value={subTopic}>
+                      {subTopic}
+                    </SelectItem>
+                  )
                 )}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+
+
 
               <div className="space-y-2">
                 <Label>Date</Label>
@@ -387,42 +392,45 @@ export default function ConstructionChecklistPage() {
                   Remove
                 </Button>
               </div>
-              <ScrollArea className="h-[300px]">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[70%]">Task</TableHead>
-                      <TableHead className="text-center">Yes</TableHead>
-                      <TableHead className="text-center">No</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="flex justify-between items-center p-2 bg-gray-50 rounded-md">
+                    <h3 className="font-medium">Task</h3>
+                    <div className="flex gap-8">
+                      <span className="w-16 text-center">Yes</span>
+                      <span className="w-16 text-center">No</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     {checklist.items.map((item, itemIdx) => (
-                      <TableRow key={itemIdx}>
-                        <TableCell>{item.task}</TableCell>
-                        <TableCell className="text-center">
+                      <div 
+                        key={itemIdx} 
+                        className="flex items-center justify-between p-3 bg-white border rounded-md hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="font-medium text-gray-800">{item.task}</span>
+                        <div className="flex gap-4">
                           <Button
                             variant={item.completed === true ? "default" : "outline"}
                             size="sm"
+                            className={`w-16 h-9 ${item.completed === true ? 'bg-green-600 hover:bg-green-700' : ''}`}
                             onClick={() => updateChecklistItem(idx, itemIdx, true)}
                           >
-                            <Check className="h-4 w-4" />
+                            <Check className="h-4 w-4 mr-1" /> Yes
                           </Button>
-                        </TableCell>
-                        <TableCell className="text-center">
                           <Button
                             variant={item.completed === false ? "destructive" : "outline"}
                             size="sm"
+                            className={`w-16 h-9 ${item.completed === false ? 'bg-red-600 hover:bg-red-700' : ''}`}
                             onClick={() => updateChecklistItem(idx, itemIdx, false)}
                           >
-                            <X className="h-4 w-4" />
+                            <X className="h-4 w-4 mr-1" /> No
                           </Button>
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                      </div>
                     ))}
-                  </TableBody>
-                </Table>
-              </ScrollArea>
+          </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -430,4 +438,7 @@ export default function ConstructionChecklistPage() {
     </DashboardLayout>
   );
 }
+
+
+
 

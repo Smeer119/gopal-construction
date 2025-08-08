@@ -44,7 +44,7 @@ export default function ContractorDashboard() {
             activities
           </p>
         </div>
-        <Link href="/dashboard/contractor/material">
+        <Link href="/dashboard/contractor/material-management">
 
           <Card className="cursor-pointer hover:shadow-md transition-shadow">
             <CardHeader className="text-center">
@@ -62,6 +62,24 @@ export default function ContractorDashboard() {
             </CardContent>
           </Card>
         </Link>
+        <Link href="/dashboard/contractor/daily">
+
+<Card className="cursor-pointer hover:shadow-md transition-shadow">
+  <CardHeader className="text-center">
+    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <FileText className="w-8 h-8 text-blue-600" />
+    </div>
+    <CardTitle className="text-xl"> Daily Material Management</CardTitle>
+    <CardDescription>Daily Progress Report</CardDescription>
+  </CardHeader>
+  <CardContent className="text-center">
+    <p className="text-sm text-gray-600 mb-4">
+      Track daily project progress and milestones
+    </p>
+    <Button className="w-full">View Materials</Button>
+  </CardContent>
+</Card>
+</Link>
       </div>
     </DashboardLayout>
   );
