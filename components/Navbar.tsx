@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Menu, X, LogOut } from 'lucide-react'
 import { getCurrentUser, signOut } from '@/lib/auth'
@@ -56,9 +57,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">BA</span>
-            </div>
+            <Image src="/logo.png" alt="BuildKaam" width={36} height={36} className="rounded-md" />
             <span className="font-semibold text-xl text-black">BuildKaam</span>
           </Link>
 

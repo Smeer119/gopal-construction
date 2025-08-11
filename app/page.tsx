@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from '@/components/Navbar'
 import { Button } from '@/components/ui/button'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { 
   ArrowRight, 
   Shield, 
@@ -22,13 +24,24 @@ import {
   MapPin,
   Phone,
   Mail,
-  Star
+  Star,
+  MessageCircle,
+  Send,
+  X,
+  Loader2
 } from 'lucide-react'
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  // AI Chatbot state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    { role: 'assistant', content: 'Hi! I am your construction assistant. Ask me anything related to DPR, BOQ, materials, scheduling, safety, and more.' }
+  ])
 
   useEffect(() => {
     checkUser()
@@ -206,7 +219,142 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Additional Features Section */}
+      {/* Our Services Section (Accordion FAQ) */}
+      <section id="services" className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl sm:text-4xl font-bold text-black mb-3">Our Services</h2>
+            <p className="text-lg text-gray-600">Expand a section to view details.</p>
+          </div>
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="ai-saas">
+              <AccordionTrigger>AI / SaaS / CMS / Cloud / IoT Services</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>AI Construction Management Tools</li>
+                  <li>AI Work Scheduling</li>
+                  <li>AI Material Procurement</li>
+                  <li>AI Estimating</li>
+                  <li>AI BOQ</li>
+                  <li>AI Vastu</li>
+                  <li>AI Monitoring</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="preconstruction">
+              <AccordionTrigger>Pre-Construction & Site Preparation</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Surveying & Marking</li>
+                  <li>Site Clearance</li>
+                  <li>Earthworks</li>
+                  <li>Dewatering</li>
+                  <li>Ground Improvement</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="planning-design">
+              <AccordionTrigger>Planning & Design</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Layout</li>
+                  <li>Concept / Schematic / Detailed Design</li>
+                  <li>3D Modeling & Rendering</li>
+                  <li>Interior, Structural, MEP, Infrastructure, Facade</li>
+                  <li>Sustainable / Green Building Design</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="pmc">
+              <AccordionTrigger>Project Management & Coordination</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Project Coordinators</li>
+                  <li>Scheduling</li>
+                  <li>Construction Management (Hybrid)</li>
+                  <li>Remote Site Monitoring</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="site-monitoring">
+              <AccordionTrigger>Site Monitoring & Progress Tracking</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Quality Inspection</li>
+                  <li>Site Safety Management</li>
+                  <li>Material Tracking</li>
+                  <li>Issue Tracking & NCR</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="costing">
+              <AccordionTrigger>Costing & Estimation</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Quantity Surveying</li>
+                  <li>BOQ Preparation</li>
+                  <li>Cost Engineering</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="tendering">
+              <AccordionTrigger>Tendering & Contracts</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Preparation of Tender Documents</li>
+                  <li>Bid Submission</li>
+                  <li>Negotiation Support</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="structural">
+              <AccordionTrigger>Structural Works</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>RCC / Concrete / Masonry</li>
+                  <li>Brickwork & Plastering</li>
+                  <li>Stone / Plum Concrete</li>
+                  <li>Rebaring, Scaffolding, PEB Erection</li>
+                  <li>Retrofitting & Strengthening</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="finishing">
+              <AccordionTrigger>Finishing Works</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Flooring, Tiling & Grouting</li>
+                  <li>Painting</li>
+                  <li>ACP / Glass Installation</li>
+                  <li>Carpentry & Furniture</li>
+                  <li>Ceiling & Waterproofing</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="mep">
+              <AccordionTrigger>MEP & Utilities Installation</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Plumbing & Electrical Works</li>
+                  <li>Fire Safety System, Lift Installation</li>
+                  <li>HVAC</li>
+                  <li>STP/WTP Plant Installation</li>
+                  <li>Mechanical Fabrication & Erection</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="demo-hse">
+              <AccordionTrigger>Demolition, Breaking & Core Works</AccordionTrigger>
+              <AccordionContent>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Demolition, Breaking & Core Works</li>
+                  <li>HSE Documentation</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      </section>
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -245,6 +393,172 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Floating AI Chatbot */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {!chatOpen && (
+          <Button onClick={() => setChatOpen(true)} className="rounded-full h-12 w-12 p-0 shadow-lg">
+            <MessageCircle className="w-6 h-6" />
+          </Button>
+        )}
+        {chatOpen && (
+          <div className="w-[340px] sm:w-[380px] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 bg-black text-white">
+              <div className="font-semibold">Construction Assistant</div>
+              <button onClick={() => setChatOpen(false)} aria-label="Close" className="opacity-80 hover:opacity-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="max-h-[50vh] overflow-y-auto p-4 space-y-3">
+              {chatMessages.map((m, idx) => (
+                <div key={idx} className={m.role === 'assistant' ? 'text-sm text-gray-800' : 'text-sm text-black'}>
+                  {m.role === 'assistant' ? (
+                    <div className="bg-gray-100 p-3 rounded-lg whitespace-pre-wrap">
+                      {m.content}
+                    </div>
+                  ) : (
+                    <div className="bg-black text-white p-3 rounded-lg whitespace-pre-wrap ml-auto max-w-[85%]">
+                      {m.content}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="text-sm text-gray-800">
+                  <div className="bg-gray-100 p-3 rounded-lg inline-flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Thinking...
+                  </div>
+                </div>
+              )}
+              {/* Contextual CTAs based on last user message */}
+              {(() => {
+                const lastUser = [...chatMessages].reverse().find(m => m.role === 'user')
+                if (!lastUser) return null
+                const q = lastUser.content.toLowerCase()
+
+                const has = (...keys: string[]) => keys.some(k => q.includes(k))
+                const actions: Array<{ label: string; href: string }> = []
+
+                // DPR / Daily
+                if (has('dpr', 'daily report', 'daily', 'report', 'how to fill dpr')) {
+                  actions.push({ label: 'Go to Daily (Contractor DPR)', href: '/dashboard/contractor/daily' })
+                  actions.push({ label: 'Go to Engineer DPR', href: '/engineer/dpr' })
+                }
+
+                // Materials (account for typos: materila, mater4ial, material)
+                if (has('material', 'materila', 'mater4ial', 'materials')) {
+                  actions.push({ label: 'Go to Material Management', href: '/dashboard/contractor/material-management' })
+                }
+
+                // Scheduling (typos too)
+                if (has('schedule', 'scheduling', 'seheduling', 'schedulling')) {
+                  actions.push({ label: 'Go to Engineer Scheduling', href: '/engineer/scheduling' })
+                }
+
+                // Forecasting
+                if (has('forecast', 'forecasting', 'plan ahead')) {
+                  actions.push({ label: 'Go to Engineer Forecasting', href: '/engineer/forecasting' })
+                }
+
+                // Reports
+                if (has('admin', 'pdf', 'reports', 'report list', 'my reports')) {
+                  actions.push({ label: 'Go to Admin Reports', href: '/dashboard/admin' })
+                  actions.push({ label: 'Go to My Reports', href: '/dashboard/my-reports' })
+                }
+
+                // Dashboards and four cards
+                if (has('contractor', 'four cards', 'fourcards', 'cards', 'dashboard contractor')) {
+                  actions.push({ label: 'Go to Contractor Dashboard', href: '/dashboard/contractor' })
+                }
+                if (has('engineer', 'dashboard engineer')) {
+                  actions.push({ label: 'Go to Engineer Dashboard', href: '/dashboard/engineer' })
+                }
+                if (has('worker', 'attendance', 'mark attendance')) {
+                  actions.push({ label: 'Go to Worker Dashboard', href: '/dashboard/worker' })
+                }
+                if (has('admin dashboard', 'admin panel')) {
+                  actions.push({ label: 'Go to Admin Dashboard', href: '/dashboard/admin' })
+                }
+
+                // Auth/profile
+                if (has('login', 'signin', 'sign in')) {
+                  actions.push({ label: 'Sign In', href: '/login' })
+                }
+                if (has('signup', 'sign up', 'register')) {
+                  actions.push({ label: 'Sign Up', href: '/signup' })
+                }
+                if (has('profile', 'my profile', 'account')) {
+                  actions.push({ label: 'Go to Profile', href: '/profile' })
+                }
+
+                if (actions.length === 0) return null
+                return (
+                  <div className="pt-2 border-t mt-2">
+                    <div className="text-xs text-gray-500 mb-2">Quick actions</div>
+                    <div className="flex flex-wrap gap-2">
+                      {actions.map((a, i) => (
+                        <Link key={i} href={a.href} className="text-xs">
+                          <Button size="sm" variant="outline" className="h-7 text-xs">
+                            {a.label}
+                          </Button>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+            <form
+              className="flex items-center gap-2 p-3 border-t bg-white"
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!chatInput.trim() || chatLoading) return
+                const userMsg = chatInput.trim()
+                setChatMessages(prev => [...prev, { role: 'user', content: userMsg }])
+                setChatInput('')
+                setChatLoading(true)
+                try {
+                  // Build full conversation for better context (server will add system)
+                  const convo = [...chatMessages, { role: 'user' as const, content: userMsg }]
+                  const resp = await fetch('/api/ai-chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: convo }),
+                  })
+                  const text = await resp.text()
+                  let data: any
+                  try { data = JSON.parse(text) } catch { data = undefined }
+                  if (!resp.ok) {
+                    let errMsg = (data?.error || 'AI error') + (data?.details ? `\n\nDetails: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}` : '')
+                    if (String(errMsg).toLowerCase().includes('api key is not configured')) {
+                      errMsg = 'AI is not configured yet. Please set your API key in .env.local (e.g., OPENAI_API_KEY or AI_PROVIDER-specific key) and restart the app.'
+                    }
+                    setChatMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
+                  } else {
+                    const content = data?.content || 'No response.'
+                    setChatMessages(prev => [...prev, { role: 'assistant', content }])
+                  }
+                } catch (err: any) {
+                  setChatMessages(prev => [...prev, { role: 'assistant', content: 'There was an error contacting the AI service.' }])
+                } finally {
+                  setChatLoading(false)
+                }
+              }}
+            >
+              <input
+                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+                placeholder="Ask construction questions…"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+              />
+              <Button type="submit" disabled={chatLoading} className="px-3">
+                <Send className="w-4 h-4" />
+              </Button>
+            </form>
+          </div>
+        )}
+      </div>
 
       {/* Benefits Section */}
       <section className="py-20 bg-gray-50">
@@ -356,10 +670,8 @@ export default function Home() {
         {/* Left Section - Logo & Copyright */}
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">BA</span>
-            </div>
-            <span className="font-semibold text-xl text-black">BuildKaam</span>
+            <Image src="/logo.png" alt="BuildKaam" width={36} height={36} className="rounded-md" />
+            <span className="font-semibold text-xl text-white">BuildKaam</span>
           </Link>
 
         {/* Right Section - Footer Links */}

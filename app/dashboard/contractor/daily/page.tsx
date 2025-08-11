@@ -770,17 +770,17 @@ export default function MaterialManagementPage() {
       const marginX = 40;
       let cursorY = 40;
 
-      // Title and metadata
+      // Title and metadata (tighter spacing)
       doc.setFontSize(18);
       doc.text("Daily Material Report", marginX, cursorY);
 
       // Add date
-      cursorY += 10;
+      cursorY += 8;
       doc.setFontSize(10);
       doc.setTextColor(100);
       const generatedOn = new Date().toLocaleString();
       doc.text(`Generated on: ${generatedOn}`, marginX, cursorY);
-      cursorY += 18;
+      cursorY += 14;
       doc.setTextColor(0);
 
       // Add summary section
@@ -807,9 +807,9 @@ export default function MaterialManagementPage() {
       ];
       summaryLines.forEach((line) => {
         doc.text(line, marginX, cursorY);
-        cursorY += 16;
+        cursorY += 12;
       });
-      cursorY += 4;
+      cursorY += 2;
 
       // Table
       const columns = [
@@ -862,11 +862,12 @@ export default function MaterialManagementPage() {
       autoTable(doc, {
         head: [columns.map((c) => c.header)],
         body: rows.map((r) => columns.map((c) => (r as any)[c.dataKey])),
-        startY: cursorY,
-        styles: { fontSize: 8, cellPadding: 3, overflow: "linebreak" },
-        headStyles: { fillColor: [33, 33, 33], textColor: 255 },
-        alternateRowStyles: { fillColor: [248, 248, 248] },
-        margin: { left: marginX, right: marginX },
+        startY: cursorY + 4,
+        styles: { fontSize: 9, cellPadding: 6, valign: 'middle', overflow: 'linebreak' },
+        headStyles: { fillColor: [33, 33, 33], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        theme: 'grid',
+        margin: { top: 20, bottom: 20, left: 20, right: 20 },
       });
 
       // Images section header
@@ -1683,7 +1684,7 @@ export default function MaterialManagementPage() {
                 <CardContent className="flex-1 overflow-hidden p-0">
                   {selectedPdf ? (
                     <div className="h-full flex flex-col">
-                      <div className="p-4 border-b flex justify-between items-center">
+                      <div className="p-4 border-b flex justify-between items-center gap-3">
                         <Button
                           variant="outline"
                           onClick={() => setSelectedPdf(null)}
@@ -1693,17 +1694,18 @@ export default function MaterialManagementPage() {
                           Back to list
                         </Button>
                         <Button
-                          onClick={() => window.open(selectedPdf, "_blank")}
+                          onClick={generateBulkPDF}
                           variant="default"
+                          className="flex items-center gap-2"
                         >
-                          <Download className="w-4 h-4 mr-2" />
-                          Download
+                          <TableIcon className="w-4 h-4" />
+                          Export
                         </Button>
                       </div>
-                      <div className="flex-1 overflow-auto">
+                      <div className="flex-1 overflow-auto p-4">
                         <iframe
                           src={selectedPdf}
-                          className="w-full h-full border-0"
+                          className="w-full h-full border rounded"
                           style={{
                             minHeight: pdfDimensions.height,
                             width: pdfDimensions.width,
@@ -1741,7 +1743,7 @@ export default function MaterialManagementPage() {
                                     onClick={() => setSelectedPdf(file.url)}
                                   >
                                     <FileText className="w-4 h-4 mr-2" />
-                                    View/Download
+                                    View
                                   </Button>
                                 </TableCell>
                               </TableRow>

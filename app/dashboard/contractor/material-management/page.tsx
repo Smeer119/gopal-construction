@@ -200,7 +200,7 @@ export default function MaterialManagementPage() {
   };
 
   // Export the current Materials table (as displayed) into a clean PDF table in the same order
-  const exportMaterialsTablePDF = (): void => {
+  const exportMaterialsTablePDF = async (): Promise<void> => {
     try {
       if (materials.length === 0) {
         toast({
@@ -214,15 +214,29 @@ export default function MaterialManagementPage() {
       // Create a landscape PDF for wider tables
       const doc = new jsPDF({ orientation: 'landscape' });
 
-      // Title
+      // Resolve current user's name from profiles for Name column
+      let userName: string | null = null;
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const uid = auth?.user?.id;
+        if (uid) {
+          const fetched = await getUserName(uid);
+          userName = fetched;
+        }
+      } catch (_) {
+        // non-fatal; keep userName as null
+      }
+
+      // Title (tighter top spacing)
       doc.setFontSize(16);
-      doc.text('Material Records', 14, 14);
+      doc.text('Material Records', 20, 20);
       doc.setFontSize(10);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 20);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 28);
 
       // Define columns to match the on-screen table (show everything)
       const columns = [
         { header: 'Date', key: 'date' },
+        { header: 'Name', key: 'name' },
         { header: 'Category', key: 'category' },
         { header: 'Sub-Category', key: 'subCategory' },
         { header: 'Item', key: 'item' },
@@ -249,6 +263,7 @@ export default function MaterialManagementPage() {
               }
             })()
           : "N/A",
+        name: userName || "N/A",
         category: m.category || "N/A",
         subCategory: m.subCategory || "N/A",
         item: m.item || "N/A",
@@ -269,16 +284,21 @@ export default function MaterialManagementPage() {
       autoTable(doc, {
         head: [columns.map(c => c.header)],
         body: rows.map(row => columns.map(c => (row as any)[c.key])),
-        startY: 80,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [33, 33, 33], textColor: 255 },
+        startY: 36, // place table closer to header
+        styles: { fontSize: 9, cellPadding: 6, valign: 'middle', minCellWidth: 24, overflow: 'linebreak' },
+        headStyles: { fillColor: [33, 33, 33], textColor: 255, fontStyle: 'bold', halign: 'center' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
-        tableWidth: 'wrap',
-        margin: { left: 40, right: 40 },
+        theme: 'grid',
+        tableWidth: 'auto',
+        margin: { top: 20, bottom: 20, left: 20, right: 20 },
         didDrawPage: (data) => {
           doc.setFontSize(8);
           const pageCount = doc.getNumberOfPages();
-          doc.text(`Page ${data.pageNumber} of ${pageCount}`, data.settings.margin.left, doc.internal.pageSize.getHeight() - 10);
+          doc.text(
+            `Page ${data.pageNumber} of ${pageCount}`,
+            data.settings.margin.left,
+            doc.internal.pageSize.getHeight() - 10
+          );
         }
       });
 
