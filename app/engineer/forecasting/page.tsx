@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -37,6 +37,7 @@ type ChecklistData = {
 export default function ConstructionChecklistPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const generatedListRef = useRef<HTMLDivElement | null>(null);
   const [userName, setUserName] = useState("");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [tempMainTopic, setTempMainTopic] = useState("");
@@ -46,6 +47,10 @@ export default function ConstructionChecklistPage() {
   const [multiSelectedChecklists, setMultiSelectedChecklists] = useState<ChecklistData[]>([]);
   const [generatedPdfs, setGeneratedPdfs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewFilePath, setPreviewFilePath] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -116,7 +121,7 @@ export default function ConstructionChecklistPage() {
   }, [currentUser]);
 
   const viewPdf = async (filePath: string) => {
-    // Use signed URL so bucket can remain private
+    // Use signed URL and show inline preview modal
     const { data, error } = await supabase.storage
       .from("pourcards")
       .createSignedUrl(filePath, 60 * 60); // 1 hour
@@ -124,23 +129,41 @@ export default function ConstructionChecklistPage() {
       toast({ title: "Error", description: "Failed to create view link", variant: "destructive" });
       return;
     }
-    window.open(data.signedUrl, "_blank");
+    setPreviewUrl(data.signedUrl);
+    setPreviewFilePath(filePath);
+    setPreviewOpen(true);
   };
 
   const downloadPdf = async (filePath: string) => {
-    const { data, error } = await supabase.storage.from("pourcards").download(filePath);
-    if (error || !data) {
-      toast({ title: "Error", description: "Failed to download PDF", variant: "destructive" });
+    // Prefer signed URL so bucket can remain private; this avoids direct /object/ access issues
+    const { data: signed, error } = await supabase.storage
+      .from("pourcards")
+      .createSignedUrl(filePath, 60 * 5); // 5 minutes
+    if (error || !signed?.signedUrl) {
+      const msg = (error as any)?.message?.toLowerCase?.() || "";
+      if (msg.includes("bucket not found")) {
+        toast({ title: "Storage error", description: "Bucket 'pourcards' not found. Create it in Supabase Storage or update the bucket name.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: "Failed to create a download link", variant: "destructive" });
+      }
       return;
     }
-    const blobUrl = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = filePath.split("/").pop() || "pourcard.pdf";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(blobUrl);
+    // Fetch the file via the signed URL to force a download
+    try {
+      const res = await fetch(signed.signedUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filePath.split("/").pop() || "pourcard.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      toast({ title: "Download failed", description: "Could not download the file.", variant: "destructive" });
+    }
   };
 
   const handleAddChecklist = () => {
@@ -284,6 +307,10 @@ export default function ConstructionChecklistPage() {
         });
 
       if (uploadError) {
+        const msg = (uploadError as any)?.message?.toLowerCase?.() || "";
+        if (msg.includes("bucket not found")) {
+          toast({ title: "Storage error", description: "Bucket 'pourcards' not found. Create it in Supabase Storage or update the bucket name in forecasting page.", variant: "destructive" });
+        }
         throw new Error(`Failed to upload PDF: ${uploadError.message}`);
       }
 
@@ -344,7 +371,7 @@ export default function ConstructionChecklistPage() {
                 Back to Dashboard
               </Button>
             </Link>
-            <Button onClick={() => router.push("/pourcards")}>
+            <Button onClick={() => { setListOpen(true); loadGeneratedPdfs(); }}>
               <FileText className="w-4 h-4 mr-2" />
               View Generated Pourcards
             </Button>
@@ -371,47 +398,7 @@ export default function ConstructionChecklistPage() {
               </SelectItem>
             ))}
 
-        {/* Generated PDFs list */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Generated PDFs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {generatedPdfs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No PDFs yet. Generate one to see it here.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>File</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {generatedPdfs.map((pdf: any) => (
-                      <TableRow key={pdf.id}>
-                        <TableCell>{pdf.date}</TableCell>
-                        <TableCell className="max-w-[360px] truncate">{pdf.description || "-"}</TableCell>
-                        <TableCell>{pdf.file_path}</TableCell>
-                        <TableCell className="text-right space-x-2">
-                          <Button variant="secondary" size="sm" onClick={() => viewPdf(pdf.file_path)}>
-                            <Eye className="w-4 h-4 mr-2" /> View
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => downloadPdf(pdf.file_path)}>
-                            <Download className="w-4 h-4 mr-2" /> Download
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        
           </SelectContent>
         </Select>
       </div>
@@ -434,6 +421,52 @@ export default function ConstructionChecklistPage() {
                     </SelectItem>
                   )
                 )}
+
+        {/* Generated PDFs Modal */}
+        {listOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setListOpen(false)} />
+            <div className="relative bg-white rounded-lg shadow-xl w-[95vw] max-w-5xl">
+              <div className="flex items-center justify-between p-3 border-b">
+                <h3 className="font-semibold text-lg">Generated PDFs</h3>
+                <Button size="sm" onClick={() => setListOpen(false)}>Close</Button>
+              </div>
+              <div className="p-4 max-h-[70vh] overflow-auto">
+                {generatedPdfs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No PDFs yet. Generate one to see it here.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {generatedPdfs.map((pdf: any) => (
+                          <TableRow key={pdf.id}>
+                            <TableCell>{pdf.date}</TableCell>
+                            <TableCell className="max-w-[360px] truncate">{pdf.description || pdf.file_path.split('/')?.pop() || "-"}</TableCell>
+                            <TableCell className="text-right space-x-2">
+                              <Button variant="secondary" size="sm" onClick={() => viewPdf(pdf.file_path)}>
+                                <Eye className="w-4 h-4 mr-1" /> View
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => downloadPdf(pdf.file_path)}>
+                                <Download className="w-4 h-4 mr-1" /> Download
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
               </SelectContent>
             </Select>
           </div>
@@ -468,6 +501,68 @@ export default function ConstructionChecklistPage() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Inline PDF Preview Modal */}
+        {previewOpen && previewUrl && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => { setPreviewOpen(false); setPreviewUrl(null); }} />
+            <div className="relative bg-white rounded-lg shadow-xl w-[95vw] h-[90vh] max-w-5xl">
+              <div className="flex items-center justify-between p-3 border-b">
+                <h3 className="font-semibold text-lg">Preview PDF</h3>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => previewFilePath && downloadPdf(previewFilePath)} disabled={!previewFilePath}>
+                    <Download className="w-4 h-4 mr-1" /> Download
+                  </Button>
+                  <Button size="sm" onClick={() => { setPreviewOpen(false); setPreviewUrl(null); }}>Close</Button>
+                </div>
+              </div>
+              <div className="w-full h-[calc(90vh-56px)]">
+                <iframe src={previewUrl} className="w-full h-full" title="PDF Preview" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generated PDFs list */}
+        <div ref={generatedListRef} />
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Generated PDFs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedPdfs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No PDFs yet. Generate one to see it here.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {generatedPdfs.map((pdf: any) => (
+                      <TableRow key={pdf.id}>
+                        <TableCell>{pdf.date}</TableCell>
+                        <TableCell className="max-w-[360px] truncate">{pdf.description || pdf.file_path.split('/')?.pop() || "-"}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="secondary" size="sm" onClick={() => viewPdf(pdf.file_path)}>
+                            <Eye className="w-4 h-4 mr-1" /> View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadPdf(pdf.file_path)}>
+                            <Download className="w-4 h-4 mr-1" /> Download
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
 

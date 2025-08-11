@@ -150,9 +150,23 @@ export default function ProfilePage() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-8">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">User Profile</h1>
-              <p className="text-gray-600">Manage your account information</p>
+            <div className="flex items-center gap-4">
+              {/* Avatar */}
+              {profile.profile_photo_url ? (
+                <img
+                  src={profile.profile_photo_url}
+                  alt={profile.name || 'Profile photo'}
+                  className="h-14 w-14 rounded-full object-cover border"
+                />
+              ) : (
+                <div className="h-14 w-14 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium border">
+                  {(profile.name?.[0] || profile.email?.[0] || 'U').toUpperCase()}
+                </div>
+              )}
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">User Profile</h1>
+                <p className="text-gray-600">Manage your account information</p>
+              </div>
             </div>
             {!editing ? (
               <Button onClick={() => setEditing(true)} className="flex items-center space-x-2">

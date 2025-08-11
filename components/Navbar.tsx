@@ -7,11 +7,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Menu, X, LogOut } from 'lucide-react'
 import { getCurrentUser, signOut } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+
 import { Button } from '@/components/ui/button'
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -21,6 +24,16 @@ export default function Navbar() {
   const checkUser = async () => {
     const currentUser = await getCurrentUser()
     setUser(currentUser)
+    if (currentUser) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single()
+      if (data) setProfile(data)
+    } else {
+      setProfile(null)
+    }
   }
 
   const handleSignOut = async () => {
@@ -65,9 +78,20 @@ export default function Navbar() {
               </>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link href="/profile" className="text-gray-700 hover:underline transition-colors">
-  {user.user_metadata?.name || user.email}
-</Link>
+                <Link href="/profile" className="flex items-center gap-2 text-gray-700 hover:underline transition-colors">
+                  {profile?.profile_photo_url ? (
+                    <img
+                      src={profile.profile_photo_url}
+                      alt={user.user_metadata?.name || user.email}
+                      className="h-8 w-8 rounded-full object-cover border"
+                    />
+                  ) : (
+                    <span className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium border">
+                      {(user.user_metadata?.name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                    </span>
+                  )}
+                  <span>{user.user_metadata?.name || user.email}</span>
+                </Link>
                 <Button
                   onClick={handleSignOut}
                   variant="outline"
@@ -122,13 +146,24 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="flex flex-col space-y-4">
-                 <Link
-  href="/profile"
-  className="text-gray-700 py-2 hover:underline transition-colors"
-  onClick={closeMenu}
->
-  {user.user_metadata?.name || user.email}
-</Link>
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 text-gray-700 py-2 hover:underline transition-colors"
+                    onClick={closeMenu}
+                  >
+                    {profile?.profile_photo_url ? (
+                      <img
+                        src={profile.profile_photo_url}
+                        alt={user.user_metadata?.name || user.email}
+                        className="h-8 w-8 rounded-full object-cover border"
+                      />
+                    ) : (
+                      <span className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium border">
+                        {(user.user_metadata?.name?.[0] || user.email?.[0] || 'U').toUpperCase()}
+                      </span>
+                    )}
+                    <span>{user.user_metadata?.name || user.email}</span>
+                  </Link>
                   <Button
                     onClick={handleSignOut}
                     variant="outline"

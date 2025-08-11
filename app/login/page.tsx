@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { signIn, getCurrentUser } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
 import { ArrowLeft } from 'lucide-react'
 
 export default function LoginPage() {
@@ -18,6 +19,7 @@ export default function LoginPage() {
     password: ''
   })
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const router = useRouter()
 
   useEffect(() => {
@@ -26,15 +28,36 @@ export default function LoginPage() {
 
   const checkExistingAuth = async () => {
     const user = await getCurrentUser()
-    if (user) {
-      const userType = user.user_metadata?.user_type
-      const role = user.user_metadata?.role
-      
-      if (userType === 'industry' && role) {
-        router.push(`/dashboard/${role}`)
-      } else {
-        router.push('/select-role')
-      }
+    if (!user) return
+
+    // Fetch profile to check completeness
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('name, phone, role, special_code')
+      .eq('id', user.id)
+      .single()
+
+    const userType = user.user_metadata?.user_type as 'individual' | 'industry' | undefined
+    const role = (profile as any)?.role as string | null
+    const nameOk = Boolean((profile as any)?.name)
+    const phoneOk = Boolean((profile as any)?.phone)
+    const specialOk = role === 'admin' || !role ? true : Boolean((profile as any)?.special_code)
+
+    // Enforce completion
+    const individualComplete = userType !== 'industry' && nameOk && phoneOk
+    const industryComplete = userType === 'industry' && nameOk && phoneOk && Boolean(role) && specialOk
+    const isComplete = individualComplete || industryComplete
+
+    if (!isComplete) {
+      router.replace('/complete-profile')
+      return
+    }
+
+    // Redirect based on role if present, else generic dashboard
+    if (userType === 'industry' && role) {
+      router.push(`/dashboard/${role}`)
+    } else {
+      router.push('/dashboard')
     }
   }
 
@@ -58,20 +81,55 @@ export default function LoginPage() {
       if (error) throw error
 
       if (data?.user) {
-        const userType = data.user.user_metadata?.user_type
-        const role = data.user.user_metadata?.role
+        // After login, enforce profile completion before dashboard
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('name, phone, role, special_code')
+          .eq('id', data.user.id)
+          .single()
 
-        // Redirect based on user type
+        const userType = data.user.user_metadata?.user_type as 'individual' | 'industry' | undefined
+        const role = (profile as any)?.role as string | null
+        const nameOk = Boolean((profile as any)?.name)
+        const phoneOk = Boolean((profile as any)?.phone)
+        const specialOk = role === 'admin' || !role ? true : Boolean((profile as any)?.special_code)
+
+        const individualComplete = userType !== 'industry' && nameOk && phoneOk
+        const industryComplete = userType === 'industry' && nameOk && phoneOk && Boolean(role) && specialOk
+        const isComplete = individualComplete || industryComplete
+
+        if (!isComplete) {
+          router.replace('/complete-profile')
+          return
+        }
+
         if (userType === 'industry' && role) {
           router.push(`/dashboard/${role}`)
         } else {
-          router.push('/select-role')
+          router.push('/dashboard')
         }
       }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    setError('')
+    setInfo('')
+    try {
+      if (!formData.email) {
+        throw new Error('Enter your email above to receive a reset link')
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      })
+      if (error) throw error
+      setInfo('Password reset email sent. Check your inbox.')
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email')
     }
   }
 
@@ -102,6 +160,11 @@ export default function LoginPage() {
                     <p className="text-red-600 text-sm">{error}</p>
                   </div>
                 )}
+                {info && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-green-700 text-sm">{info}</p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -125,6 +188,17 @@ export default function LoginPage() {
                     onChange={(e) => handleInputChange('password', e.target.value)}
                     required
                   />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div />
+                  <button
+                    type="button"
+                    onClick={handleForgotPassword}
+                    className="text-sm text-gray-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
                 </div>
 
                 <Button 
