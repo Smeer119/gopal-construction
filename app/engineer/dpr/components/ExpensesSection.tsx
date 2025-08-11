@@ -31,6 +31,16 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
   expensesData,
   onUpdateExpenses
 }) => {
+  // Sanitize numeric input to avoid superscripts/zero-width characters
+  const sanitizeNumericInput = (v: string): string => {
+    return (v || '')
+      .toString()
+      .normalize('NFKC')
+      .replace(/[\u00B9\u2070-\u2079\u200B-\u200D\uFEFF]/g, '') // superscripts + zero-width
+      .replace(/\u00A0/g, ' ') // nbsp -> space
+      .replace(/[^0-9.]/g, '') // keep digits and dot
+  }
+
   // Petty Cash States
   const [showPettyCashForm, setShowPettyCashForm] = useState(false)
   const [editingPettyCashId, setEditingPettyCashId] = useState<string | null>(null)
@@ -61,7 +71,7 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
     e.preventDefault()
     const submitData = {
       details: pettyCashFormData.details,
-      amount: parseFloat(pettyCashFormData.amount) || 0,
+      amount: parseFloat(sanitizeNumericInput(pettyCashFormData.amount)) || 0,
       date: pettyCashFormData.date
     }
 
@@ -108,7 +118,7 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
     e.preventDefault()
     const submitData = {
       description: expenseFormData.description,
-      amount: parseFloat(expenseFormData.amount) || 0,
+      amount: parseFloat(sanitizeNumericInput(expenseFormData.amount)) || 0,
       receipt_image: expenseFormData.receipt_image
     }
 
@@ -183,7 +193,7 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
             </div>
             <div className="text-center">
               <p className="text-sm text-gray-600">Balance</p>
-              <p className={`text-lg font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className={`text-lg font-bold ₹{balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ₹{balance.toFixed(2)}
               </p>
             </div>
@@ -255,7 +265,7 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
                     type="number"
                     step="0.01"
                     value={pettyCashFormData.amount}
-                    onChange={(e) => setPettyCashFormData({ ...pettyCashFormData, amount: e.target.value })}
+                    onChange={(e) => setPettyCashFormData({ ...pettyCashFormData, amount: sanitizeNumericInput(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                    placeholder="Enter amount"
                     min="0"
@@ -373,9 +383,9 @@ export const ExpensesSection: React.FC<ExpensesSectionProps> = ({
                     type="number"
                     step="0.01"
                     value={expenseFormData.amount}
-                    onChange={(e) => setExpenseFormData({ ...expenseFormData, amount: e.target.value })}
+                    onChange={(e) => setExpenseFormData({ ...expenseFormData, amount: sanitizeNumericInput(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                   placeholder="Enter amount"
+                    placeholder="Enter amount"
                     min="0"
                     required
                   />

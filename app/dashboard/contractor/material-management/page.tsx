@@ -46,6 +46,11 @@ import { Plus, Download, X, FileText, ArrowLeft, CheckCircle, Clock, Trash2, Bar
 // Import material categories from data.ts
 import { materialCategories } from './data';
 
+// Remove these lines from the top of your file:
+// export const dynamic = 'force-dynamic';
+// export const revalidate = 0;
+// export const fetchCache = 'force-no-store';
+
 interface Material {
   id: string;
   date: string;
@@ -236,21 +241,29 @@ export default function MaterialManagementPage() {
 
       // Build rows with N/A fallback to keep layout consistent
       const rows = materials.map((m) => ({
-        date: m.date ? (() => { try { return format(parseISO(m.date), 'yyyy-MM-dd'); } catch { return m.date; } })() : 'N/A',
-        category: m.category || 'N/A',
-        subCategory: m.subCategory || 'N/A',
-        item: m.item || 'N/A',
-        poNumber: m.poNumber || 'N/A',
-        size: m.size || 'N/A',
-        quantity: (m.quantity ?? '') === '' ? 'N/A' : String(m.quantity),
-        unit: m.unit || 'N/A',
-        grade: m.grade || 'N/A',
-        brand: m.brand || 'N/A',
-        supplier: m.supplier || 'N/A',
-        vehicleNo: m.vehicleNo || 'N/A',
-        qrCode: m.qrCode || 'N/A',
-        barcode: m.barcode || 'N/A',
-        remarks: m.remarks || 'N/A',
+        date: m.date ? (() => {
+              try {
+                return format(parseISO(m.date), "yyyy-MM-dd");
+              } catch {
+                return m.date;
+              }
+            })()
+          : "N/A",
+        category: m.category || "N/A",
+        subCategory: m.subCategory || "N/A",
+        item: m.item || "N/A",
+        poNumber: m.poNumber || "N/A",
+        size: m.size || "N/A",
+        quantity: m.quantity === undefined || m.quantity === null ? 'N/A' : m.quantity,
+        unit: m.unit || "N/A",
+        grade: m.grade || "N/A",
+        brand: m.brand || "N/A",
+        supplier: m.supplier || "N/A",
+        vehicleNo: m.vehicleNo || "N/A",
+        qrCode: m.qrCode || "N/A",
+        barcode: m.barcode || "N/A",
+        remarks: m.remarks || "N/A",
+        photosCount: (m.photos || []).length,
       }));
 
       autoTable(doc, {
@@ -546,7 +559,8 @@ export default function MaterialManagementPage() {
       const uploadPromises = files.map(async (file: File, index: number): Promise<string> => {
         const fileExt = file.name.split('.').pop();
         const fileName = `${materialId}_${index}.${fileExt}`;
-        const filePath = `photos/${materialId}/${fileName}`;
+        const userPrefix = currentUser?.id ? `${currentUser.id}/` : '';
+        const filePath = `${userPrefix}photos/${materialId}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from('materials')
@@ -657,7 +671,8 @@ export default function MaterialManagementPage() {
   // Upload a PDF blob to Supabase Storage and return its public URL
   const uploadPdfToStorage = async (blob: Blob, fileName: string): Promise<string | null> => {
     try {
-      const path = `pdfs/${fileName}`;
+      const userPrefix = currentUser?.id ? `${currentUser.id}/` : '';
+      const path = `${userPrefix}pdfs/${fileName}`;
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('materials')
         .upload(path, blob, {
@@ -714,10 +729,8 @@ const savePdfReportMetadata = async (pdfUrl: string): Promise<void> => {
     if (error) {
       console.error('Insert pdf_reports error:', error);
     }
-    return (data?.name as string) || null;
   } catch (err) {
-    console.error('Unexpected error fetching user name:', err);
-    return null;
+    console.error('Unexpected error saving PDF metadata:', err);
   }
 };
 
@@ -813,7 +826,7 @@ const generateBulkPDF = async (): Promise<void> => {
       item: m.item || 'N/A',
       poNumber: m.poNumber || 'N/A',
       size: m.size || 'N/A',
-      quantity: (m.quantity ?? '') === '' ? 'N/A' : m.quantity,
+      quantity: (m.quantity === undefined || m.quantity === null) ? 'N/A' : m.quantity,
       unit: m.unit || 'N/A',
       grade: m.grade || 'N/A',
       brand: m.brand || 'N/A',
@@ -939,7 +952,7 @@ const fetchPdfList = async (): Promise<void> => {
 useEffect(() => {
   fetchPdfList();
   // re-fetch when user changes
-}, [currentUser?.id]);
+}, [currentUser?.id, materials]);
 
   return (
     <DashboardLayout role="worker">
@@ -1278,7 +1291,6 @@ useEffect(() => {
                   </div>
                 </CardContent>
               </Card>
-// ...
             ))}
 
             <div className="flex justify-end gap-4 pt-2">
@@ -1361,68 +1373,74 @@ useEffect(() => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {materials.length > 0 ? (
-                        materials.map((material) => (
-                          <TableRow key={material.id}>
-                            <TableCell>
-                              {material?.date ? (() => { try { return format(parseISO(material.date), "PP"); } catch { return material.date || 'N/A'; } })() : 'N/A'}
-                            </TableCell>
-                            <TableCell>{material.category || 'N/A'}</TableCell>
-                            <TableCell>{material.subCategory || 'N/A'}</TableCell>
-                            <TableCell className="font-medium">{material.item || 'N/A'}</TableCell>
-                            <TableCell>{material.poNumber || 'N/A'}</TableCell>
-                            <TableCell>{material.size || 'N/A'}</TableCell>
-                            <TableCell>{(material.quantity ?? '') === '' ? 'N/A' : material.quantity}</TableCell>
-                            <TableCell>{material.unit || 'N/A'}</TableCell>
-                            <TableCell>{material.grade || 'N/A'}</TableCell>
-                            <TableCell>{material.brand || 'N/A'}</TableCell>
-                            <TableCell>{material.supplier || 'N/A'}</TableCell>
-                            <TableCell>{material.vehicleNo || 'N/A'}</TableCell>
-                            <TableCell>{material.qrCode || 'N/A'}</TableCell>
-                            <TableCell>{material.barcode || 'N/A'}</TableCell>
-                            <TableCell className="max-w-[240px] truncate" title={material.remarks || 'N/A'}>{material.remarks || 'N/A'}</TableCell>
-                            <TableCell>{(material.photos || []).length}</TableCell>
-                            <TableCell className="flex gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => {
-                                  // Move material to edit mode
-                                  setMaterialsInProgress(prev => [
-                                    ...prev.filter(m => m.id !== material.id),
-                                    material
-                                  ]);
-                                  setActiveMaterialIndex(materialsInProgress.length);
-                                  // Scroll to the form
-                                  document.getElementById('material-form')?.scrollIntoView({ behavior: 'smooth' });
-                                }}
-                                title="Edit material"
-                              >
-                                <FileText className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => deleteMaterial(material.id)}
-                                title="Delete material"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={17}
-                            className="text-center py-8 text-gray-500"
-                          >
-                            No material records yet. Add materials to see them here.
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
+                      {materials.length > 0
+    ? materials.map((material) => (
+        <TableRow key={material.id}>
+          <TableCell>
+            {material?.date
+              ? (() => {
+                  try {
+                    return format(parseISO(material.date), "PP");
+                  } catch {
+                    return material.date || 'N/A';
+                  }
+                })()
+              : 'N/A'}
+          </TableCell>
+          <TableCell>{material.category || 'N/A'}</TableCell>
+          <TableCell>{material.subCategory || 'N/A'}</TableCell>
+          <TableCell className="font-medium">{material.item || 'N/A'}</TableCell>
+          <TableCell>{material.poNumber || 'N/A'}</TableCell>
+          <TableCell>{material.size || 'N/A'}</TableCell>
+          <TableCell>{material.quantity === undefined || material.quantity === null ? 'N/A' : material.quantity}</TableCell>
+          <TableCell>{material.unit || 'N/A'}</TableCell>
+          <TableCell>{material.grade || 'N/A'}</TableCell>
+          <TableCell>{material.brand || 'N/A'}</TableCell>
+          <TableCell>{material.supplier || 'N/A'}</TableCell>
+          <TableCell>{material.vehicleNo || 'N/A'}</TableCell>
+          <TableCell>{material.qrCode || 'N/A'}</TableCell>
+          <TableCell>{material.barcode || 'N/A'}</TableCell>
+          <TableCell className="max-w-[240px] truncate" title={material.remarks || 'N/A'}>{material.remarks || 'N/A'}</TableCell>
+          <TableCell>{(material.photos || []).length}</TableCell>
+          <TableCell className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                // Move material to edit mode
+                setMaterialsInProgress(prev => [
+                  ...prev.filter(m => m.id !== material.id),
+                  material
+                ]);
+                setActiveMaterialIndex(materialsInProgress.length);
+                // Scroll to the form
+                document.getElementById('material-form')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              title="Edit material"
+            >
+              <FileText className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive"
+              onClick={() => deleteMaterial(material.id)}
+              title="Delete material"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </TableCell>
+        </TableRow>
+      ))
+    : (
+        <TableRow>
+          <TableCell colSpan={17} className="text-center py-8 text-gray-500">
+            No material records yet. Add materials to see them here.
+          </TableCell>
+        </TableRow>
+      )
+  }
+</TableBody>
                   </Table>
                 </div>
               </div>
@@ -1490,8 +1508,8 @@ useEffect(() => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {pdfFiles && pdfFiles.length > 0 ? (
-                          pdfFiles.map((file) => (
+                        {(pdfFiles?.length ?? 0) > 0 && (
+                          pdfFiles!.map((file) => (
                             <TableRow key={file.name}>
                               <TableCell>
                                 {file.createdAt ? new Date(file.createdAt).toLocaleString() : '-'}
@@ -1509,12 +1527,10 @@ useEffect(() => {
                               </TableCell>
                             </TableRow>
                           ))
-                        ) : (
+                        )}
+                        {!(pdfFiles && pdfFiles.length > 0) && (
                           <TableRow>
-                            <TableCell
-                              colSpan={3}
-                              className="text-center py-8 text-gray-500"
-                            >
+                            <TableCell colSpan={3} className="text-center py-8 text-gray-500">
                               No PDFs generated yet
                             </TableCell>
                           </TableRow>

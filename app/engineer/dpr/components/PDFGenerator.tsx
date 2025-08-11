@@ -1,8 +1,9 @@
 import { jsPDF } from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 import { Button } from '@/components/ui/button'
 import { FileDown, Edit, X, Eye, RotateCcw, ArrowRight } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { format } from 'date-fns'
 import { Contractor } from './ContractorSection'
 import { DepartmentLabour } from './DepartmentLabourSection'
@@ -37,6 +38,11 @@ interface PDFGeneratorProps {
 
 export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }) => {
   const [showPreview, setShowPreview] = useState(false)
+  // Supabase client
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  )
 
   const startNew = () => {
     if (confirm('Are you sure you want to start a new report? This will clear all current data.')) {
@@ -55,11 +61,56 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }
     let yPosition = 20
     let currentPage = 1
     
+    // Text sanitization and currency formatting helpers
+    // Removes invisible/formatting and superscript digits that sometimes creep into inputs
+    const sanitize = (v: string | number | null | undefined): string => {
+      if (v === null || v === undefined) return ''
+      return v
+        .toString()
+        .normalize('NFKC')
+        .replace(/[\u00B9\u2070-\u2079\u200B-\u200D\uFEFF]/g, '') // superscripts, zero-width, BOM
+        .replace(/\u00A0/g, ' ') // no-break space -> normal space
+        .trim()
+    }
+
+    // Standardized table renderer: gray headers, black text, thicker black borders
+    const renderTable = (options: Parameters<typeof autoTable>[1]) => {
+      const base = {
+        margin: { left: margin, right: margin },
+        theme: 'grid' as const,
+        styles: {
+          font: 'helvetica',
+          fontSize: 10,
+          textColor: [0, 0, 0] as [number, number, number],
+          lineColor: [0, 0, 0] as [number, number, number],
+          lineWidth: 0.4,
+        },
+        headStyles: {
+          fillColor: [220, 220, 220] as [number, number, number], // unify to darker gray
+          textColor: [0, 0, 0] as [number, number, number],       // black header text
+          fontStyle: 'bold' as const,
+          lineColor: [0, 0, 0] as [number, number, number],
+          lineWidth: 0.6,
+        },
+        bodyStyles: {
+          textColor: [0, 0, 0] as [number, number, number],
+        },
+        tableLineColor: [0, 0, 0] as [number, number, number],
+        tableLineWidth: 0.6,
+      }
+      autoTable(pdf, { ...base, ...options })
+    }
+
+    const formatAmount = (num: number): string => `Rs ${Number(num || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    
+    // Queue to render images at the very end, with labels per section
+    const imageQueue: { label: string; src: string }[] = []
+    
     // Helper function to add company footer with page number
     const addFooter = (pageNum: number) => {
       pdf.setFontSize(12)
       pdf.setFont('helvetica', 'bold')
-      pdf.text('Gopal Deshmukh', pageWidth / 2, pageHeight - 10, { align: 'center' })
+      pdf.text('BUILD KAAM', pageWidth / 2, pageHeight - 10, { align: 'center' })
       pdf.setFontSize(8)
       pdf.setFont('helvetica', 'normal')
       pdf.text(`Page ${pageNum}`, pageWidth - 20, pageHeight - 5, { align: 'right' })
@@ -86,27 +137,36 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }
     pdf.setFontSize(20)
     pdf.setFont('helvetica', 'bold')
     pdf.text('Daily Progress Report (DPR)', pageWidth / 2, yPosition, { align: 'center' })
+    // Draw a uniform gray section header bar with black text
+    const drawSectionHeader = (title: string) => {
+      checkPageBreak(18)
+      pdf.setFillColor(220, 220, 220)
+      pdf.rect(margin, yPosition, contentWidth, 10, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(14)
+      pdf.text(title, margin + 4, yPosition + 7)
+      yPosition += 12
+    }
+
     yPosition += 20
 
-    // Site Information
-    pdf.setFontSize(14)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text('Site Information', 20, yPosition)
-    yPosition += 10
+    // Site Information (table)
+    drawSectionHeader('Site Information')
+    renderTable({
+      startY: yPosition + 5,
+      head: [[ 'Field', 'Value' ]],
+      body: [
+        ['Site Name', sanitize(reportData.siteName)],
+        ['Date', sanitize(reportData.date)],
+        ['Weather', sanitize(reportData.weather)],
+        ['Temperature', sanitize(reportData.temperature)],
+      ],
+    })
+    yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
 
-    pdf.setFontSize(12)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text(`Site Name: ${reportData.siteName}`, 20, yPosition)
-    yPosition += 8
-    pdf.text(`Date: ${reportData.date}`, 20, yPosition)
-    yPosition += 8
-    pdf.text(`Weather: ${reportData.weather}`, 20, yPosition)
-    yPosition += 8
-    pdf.text(`Temperature: ${reportData.temperature}`, 20, yPosition)
-    yPosition += 15
-
-    // Check if we need a new page
-    const checkPageBreak = (requiredSpace: number = 30) => {
+    // Check if we need a new page (function-declared for hoisting)
+    function checkPageBreak(requiredSpace: number = 30) {
       if (yPosition + requiredSpace > maxContentHeight) {
         addNewPage()
       }
@@ -123,451 +183,228 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }
     const balance = totalReceived - totalExpenses
 
     checkPageBreak(40)
-    pdf.setFontSize(14)
-    pdf.setFont('helvetica', 'bold')
-    pdf.text('Summary', margin, yPosition)
-    yPosition += 10
+    drawSectionHeader('Summary')
+    renderTable({
+      startY: yPosition + 5,
+      head: [[ 'Metric', 'Value' ]],
+      body: [
+        ['Total Contractors', sanitize(reportData.contractors.length)],
+        ['Total Manpower', sanitize(totalManpower)],
+        ['Equipment in Use', sanitize(reportData.equipment.length)],
+        ['Visitors Today', sanitize(reportData.visitors.length)],
+        ['Critical Issues', sanitize(reportData.issues.length)],
+        ["Today's Work Items", sanitize(reportData.todayWork.length)],
+        ["Tomorrow's Work Items", sanitize(reportData.tomorrowWork.length)],
+        ['Cash Balance', sanitize(formatAmount(balance))],
+        ['Material Tests', sanitize(reportData.materialTests.length)],
+      ],
+    })
+    yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
 
-    pdf.setFontSize(12)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text(`Total Contractors: ${reportData.contractors.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Total Manpower: ${totalManpower}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Equipment in Use: ${reportData.equipment.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Visitors Today: ${reportData.visitors.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Critical Issues: ${reportData.issues.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Today's Work Items: ${reportData.todayWork.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Tomorrow's Work Items: ${reportData.tomorrowWork.length}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Cash Balance: ₹${balance.toFixed(2)}`, margin, yPosition)
-    yPosition += 8
-    pdf.text(`Material Tests: ${reportData.materialTests.length}`, margin, yPosition)
-    yPosition += 15
-
-    // Contractors Section
+    // Contractors Section (table)
     if (reportData.contractors.length > 0) {
-      const sectionHeight = 40 + (reportData.contractors.length * 35)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Contractors', margin, yPosition)
-      yPosition += 10
-
-      reportData.contractors.forEach((contractor, index) => {
-        checkPageBreak(35)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${contractor.name} (${contractor.role})`, margin + 5, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Manpower: ${contractor.manpower}`, margin + 10, yPosition)
-        yPosition += 8
-        if (contractor.working_description) {
-          const descLines = pdf.splitTextToSize(`Description: ${contractor.working_description}`, contentWidth - 40)
-          checkPageBreak(descLines.length * 6 + 10)
-          pdf.text(descLines, margin + 10, yPosition)
-          yPosition += descLines.length * 6 + 5
-        } else {
-          yPosition += 5
-        }
+      drawSectionHeader('Contractors')
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Name', 'Role', 'Manpower', 'Description' ]],
+        body: reportData.contractors.map((c, i) => [
+          (i + 1).toString(),
+          sanitize(c.name),
+          sanitize(c.role),
+          sanitize(c.manpower),
+          sanitize(c.working_description || ''),
+        ]),
       })
-      yPosition += 10
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
     }
 
-    // Department Labours Section
+    // Department Labours (tables)
     if (reportData.labours.genderLabours.length > 0 || reportData.labours.skilledWorkers.length > 0) {
-      const sectionHeight = 60 + (reportData.labours.genderLabours.length * 15) + (reportData.labours.skilledWorkers.length * 25)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Department Labours', margin, yPosition)
-      yPosition += 10
+      drawSectionHeader('Department Labours')
 
-      // Gender-based workers
       if (reportData.labours.genderLabours.length > 0) {
-        checkPageBreak(25)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('Gender-based Workers:', margin + 5, yPosition)
-        yPosition += 8
-        
-        reportData.labours.genderLabours.forEach((labour, index) => {
-          checkPageBreak(15)
-          pdf.setFont('helvetica', 'normal')
-          pdf.text(`${index + 1}. ${labour.gender}: ${labour.manpower} workers`, margin + 10, yPosition)
-          yPosition += 8
+        renderTable({
+          startY: yPosition + 5,
+          head: [[ 'S.No.', 'Gender', 'Manpower' ]],
+          body: reportData.labours.genderLabours.map((l, i) => [
+            (i + 1).toString(), sanitize(l.gender), sanitize(l.manpower)
+          ]),
         })
-        yPosition += 5
+        yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 6
       }
 
-      // Skilled workers
       if (reportData.labours.skilledWorkers.length > 0) {
-        checkPageBreak(25)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('Skilled Workers:', margin + 5, yPosition)
-        yPosition += 8
-        
-        reportData.labours.skilledWorkers.forEach((worker, index) => {
-          checkPageBreak(35)
-          pdf.setFont('helvetica', 'normal')
-          pdf.text(`${index + 1}. ${worker.skilled_worker}: ${worker.skilled_manpower} workers`, margin + 10, yPosition)
-          yPosition += 8
-          if (worker.working_description) {
-            const descLines = pdf.splitTextToSize(`Description: ${worker.working_description}`, contentWidth - 40)
-            checkPageBreak(descLines.length * 6 + 10)
-            pdf.text(descLines, margin + 10, yPosition)
-            yPosition += descLines.length * 6 + 5
-          } else {
-            yPosition += 5
-          }
+        renderTable({
+          startY: yPosition + 5,
+          head: [[ 'S.No.', 'Skilled Worker', 'Manpower', 'Description' ]],
+          body: reportData.labours.skilledWorkers.map((w, i) => [
+            (i + 1).toString(), sanitize(w.skilled_worker), sanitize(w.skilled_manpower), sanitize(w.working_description || '')
+          ]),
+        })
+        yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+      }
+    }
+
+    // Today Work (moved up to match sequence)
+    if (reportData.todayWork.length > 0) {
+      drawSectionHeader("Today's Work")
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Categories', 'Quantity', 'Manpower', 'Description' ]],
+        body: reportData.todayWork.map((w, i) => [
+          (i + 1).toString(), sanitize(w.work_categories.join(', ')), sanitize(w.quantity), sanitize(w.manpower), sanitize(w.working_description || '')
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+    }
+
+    // Equipment & Machinery (table)
+    if (reportData.equipment.length > 0) {
+      drawSectionHeader('Equipment & Machinery')
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Machine', 'From', 'To', 'Description' ]],
+        body: reportData.equipment.map((e, i) => [
+          (i + 1).toString(), sanitize(e.machine_type), sanitize(e.from_time), sanitize(e.to_time), sanitize(e.working_description || '')
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+    }
+
+    // Tomorrow / Upcoming Work (after Equipment)
+    if (reportData.tomorrowWork.length > 0) {
+      drawSectionHeader("Tomorrow's Work")
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Categories', 'Quantity', 'Manpower', 'Description' ]],
+        body: reportData.tomorrowWork.map((w, i) => [
+          (i + 1).toString(), sanitize(w.work_categories.join(', ')), sanitize(w.quantity), sanitize(w.manpower), sanitize(w.working_description || '')
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+    }
+
+    // Material Requirements (table)
+    if (reportData.materialRequirements && reportData.materialRequirements.length > 0) {
+      drawSectionHeader('Material Requirements')
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Description' ]],
+        body: reportData.materialRequirements.map((m, i) => [
+          (i + 1).toString(), sanitize(m.description)
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+
+      // Material Testing (moved up to match sequence)
+      if (reportData.materialTests.length > 0) {
+        drawSectionHeader('Material Testing')
+        renderTable({
+          startY: yPosition + 5,
+          head: [[ 'S.No.', 'Test Type', 'Description' ]],
+          body: reportData.materialTests.map((t, i) => [
+            (i + 1).toString(), sanitize(t.test_type), sanitize(t.description)
+          ]),
+        })
+        yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+        // Queue images to render at end under label
+        reportData.materialTests.forEach((t) => {
+          (t.test_images || []).forEach((img) => imageQueue.push({ label: `Material Testing - ${sanitize(t.test_type)}`, src: img }))
         })
       }
-      yPosition += 10
+
+      // Critical Site Issues (moved up to match sequence)
+      if (reportData.issues.length > 0) {
+        drawSectionHeader('Critical Site Issues')
+        renderTable({
+          startY: yPosition + 5,
+          head: [[ 'S.No.', 'Description' ]],
+          body: reportData.issues.map((iss, i) => [ (i + 1).toString(), sanitize(iss.description) ]),
+        })
+        yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
+      }
     }
 
-    // Equipment Section
-    if (reportData.equipment.length > 0) {
-      const sectionHeight = 40 + (reportData.equipment.length * 35)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Equipment & Machinery', margin, yPosition)
-      yPosition += 10
+    // (Removed narrative Tomorrow's Work to avoid duplication)
 
-      reportData.equipment.forEach((eq, index) => {
-        checkPageBreak(35)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${eq.machine_type}`, margin + 5, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Time: ${eq.from_time} - ${eq.to_time}`, margin + 10, yPosition)
-        yPosition += 8
-        if (eq.working_description) {
-          const descLines = pdf.splitTextToSize(`Description: ${eq.working_description}`, contentWidth - 40)
-          checkPageBreak(descLines.length * 6 + 10)
-          pdf.text(descLines, margin + 10, yPosition)
-          yPosition += descLines.length * 6 + 5
-        } else {
-          yPosition += 5
-        }
-      })
-      yPosition += 10
-    }
-
-    // Visitors Section
+    // Today Visitors (moved near end before Expenses)
     if (reportData.visitors.length > 0) {
-      const sectionHeight = 30 + (reportData.visitors.length * 20)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Today\'s Visitors', 20, yPosition)
-      yPosition += 10
-
-      reportData.visitors.forEach((visitor, index) => {
-        checkPageBreak(20)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${visitor.visitor_types.join(', ')}`, 25, yPosition)
-        yPosition += 8
-        if (visitor.visit_description) {
-          pdf.setFont('helvetica', 'normal')
-          const descLines = pdf.splitTextToSize(`Purpose: ${visitor.visit_description}`, pageWidth - 60)
-          pdf.text(descLines, 30, yPosition)
-          yPosition += descLines.length * 6 + 5
-        } else {
-          yPosition += 5
-        }
+      drawSectionHeader("Today's Visitors")
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Types', 'Purpose' ]],
+        body: reportData.visitors.map((v, i) => [
+          (i + 1).toString(), sanitize(v.visitor_types.join(', ')), sanitize(v.visit_description || '')
+        ]),
       })
-      yPosition += 10
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 10
     }
 
-    // Critical Issues Section
-    if (reportData.issues.length > 0) {
-      const sectionHeight = 30 + (reportData.issues.length * 25)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Critical Site Issues', 20, yPosition)
-      yPosition += 10
-
-      reportData.issues.forEach((issue, index) => {
-        checkPageBreak(20)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. Critical Issue`, 25, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        const descLines = pdf.splitTextToSize(`Description: ${issue.description}`, pageWidth - 60)
-        pdf.text(descLines, 30, yPosition)
-        yPosition += descLines.length * 6 + 5
-      })
-      yPosition += 10
-    }
-
-    // Today's Work Section
-    if (reportData.todayWork.length > 0) {
-      const sectionHeight = 30 + (reportData.todayWork.length * 35)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Today\'s Work', 20, yPosition)
-      yPosition += 10
-
-      reportData.todayWork.forEach((work, index) => {
-        checkPageBreak(30)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${work.work_categories.join(', ')}`, 25, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Quantity: ${work.quantity} | Manpower: ${work.manpower}`, 30, yPosition)
-        yPosition += 8
-        if (work.working_description) {
-          const descLines = pdf.splitTextToSize(`Description: ${work.working_description}`, pageWidth - 60)
-          pdf.text(descLines, 30, yPosition)
-          yPosition += descLines.length * 6 + 5
-        } else {
-          yPosition += 5
-        }
-      })
-      yPosition += 10
-    }
-
-    // Tomorrow's Work Section
-    if (reportData.tomorrowWork.length > 0) {
-      const sectionHeight = 30 + (reportData.tomorrowWork.length * 30)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Tomorrow\'s Work', 20, yPosition)
-      yPosition += 10
-
-      reportData.tomorrowWork.forEach((work, index) => {
-        checkPageBreak(25)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${work.work_categories.join(', ')}`, 25, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Quantity: ${work.quantity} | Manpower: ${work.manpower}`, 30, yPosition)
-        yPosition += 8
-        if (work.working_description) {
-          const descLines = pdf.splitTextToSize(`Description: ${work.working_description}`, pageWidth - 60)
-          pdf.text(descLines, 30, yPosition)
-          yPosition += descLines.length * 6 + 5
-        } else {
-          yPosition += 5
-        }
-      })
-      yPosition += 10
-    }
-
-    // Petty Cash entries
+    // Petty Cash entries (table)
     if (reportData.expensesData.pettyCash && reportData.expensesData.pettyCash.length > 0) {
-      checkPageBreak(20)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Petty Cash:', 20, yPosition)
-      yPosition += 10
+      checkPageBreak(30)
+      drawSectionHeader('Petty Cash')
       
-      reportData.expensesData.pettyCash.forEach((cash, index: number) => {
-        checkPageBreak(15)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`${index + 1}. ${cash.details} - ₹${cash.amount} (${cash.date})`, 25, yPosition)
-        yPosition += 8
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Details', 'Date', 'Amount' ]],
+        body: reportData.expensesData.pettyCash.map((cash, i) => [
+          (i + 1).toString(),
+          sanitize(cash.details),
+          sanitize(cash.date),
+          sanitize(formatAmount(cash.amount)),
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 8
+    }
+
+    // Expense entries (table) and receipts after table
+    if (reportData.expensesData.expenses && reportData.expensesData.expenses.length > 0) {
+      checkPageBreak(30)
+      drawSectionHeader('Expenses')
+      
+      renderTable({
+        startY: yPosition + 5,
+        head: [[ 'S.No.', 'Description', 'Amount' ]],
+        body: reportData.expensesData.expenses.map((exp, i) => [
+          (i + 1).toString(),
+          sanitize(exp.description),
+          sanitize(formatAmount(exp.amount)),
+        ]),
+      })
+      yPosition = ((pdf as any).lastAutoTable?.finalY || yPosition) + 8
+
+      // Queue Expense receipt images to render at end
+      const receipts = reportData.expensesData.expenses.map(e => e.receipt_image).filter((img): img is string => !!img)
+      receipts.forEach((img) => imageQueue.push({ label: 'Expense Receipt', src: img }))
+    }
+
+    // (Removed duplicate custom Material Requirements section)
+
+    // (Material Testing and Critical Site Issues moved earlier)
+    // (Moved Today's Work earlier; consolidated Tomorrow's Work above)
+
+    // Render all queued images at the very end, after all tables
+    if (imageQueue.length > 0) {
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Images', margin, yPosition)
+      yPosition += 8
+      imageQueue.forEach(({ label, src }) => {
+        checkPageBreak(90)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(11)
+        pdf.text(sanitize(label), margin, yPosition)
+        yPosition += 5
+        const type = src.startsWith('data:image/png') ? 'PNG' : 'JPEG'
+        try {
+          pdf.addImage(src, type as any, margin, yPosition, contentWidth, 0)
+          yPosition += 70
+        } catch {
+          yPosition += 5
+        }
       })
       yPosition += 5
-    }
-
-    // Expense entries
-    if (reportData.expensesData.expenses.length > 0) {
-      checkPageBreak(20)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Expenses:', 20, yPosition)
-      yPosition += 10
-      
-      reportData.expensesData.expenses.forEach((expense, index: number) => {
-        checkPageBreak(15)
-        pdf.setFont('helvetica', 'normal')
-        // Fix amount display by removing any trailing '1' and ensure proper formatting
-        const amountText = `₹${expense.amount.toFixed(2)}`.replace(/\.?1$/, '')
-        pdf.text(`${index + 1}. ${expense.description} - ${amountText}`, 25, yPosition)
-        yPosition += 8
-      })
-      yPosition += 10
-    }
-
-    // Material Requirements Section
-    if (reportData.materialRequirements && reportData.materialRequirements.length > 0) {
-      const sectionHeight = 40 + (reportData.materialRequirements.length * 20)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Material Requirements', 20, yPosition)
-      yPosition += 10
-
-      // Create table header
-      pdf.setFillColor(240, 240, 240)
-      pdf.rect(20, yPosition, contentWidth, 10, 'F')
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('S.No.', 25, yPosition + 7)
-      pdf.text('Description', 50, yPosition + 7)
-      yPosition += 12
-
-      // Add table rows
-      pdf.setFont('helvetica', 'normal')
-      reportData.materialRequirements.forEach((item: MaterialRequirement, index: number) => {
-        checkPageBreak(20)
-        
-        // Draw row background for better readability
-        if (index % 2 === 0) {
-          pdf.setFillColor(250, 250, 250)
-          pdf.rect(20, yPosition - 2, contentWidth, 15, 'F')
-        }
-        
-        // Draw cell borders
-        pdf.rect(20, yPosition - 2, contentWidth, 15)
-        
-        // Add cell content
-        pdf.text((index + 1).toString(), 25, yPosition + 8)
-        
-        // Split description to fit in cell
-        const descLines = pdf.splitTextToSize(item.description, contentWidth - 50)
-        
-        // Add first line of description
-        pdf.text(descLines[0], 50, yPosition + 8)
-        
-        // Handle multi-line descriptions
-        if (descLines.length > 1) {
-          for (let i = 1; i < descLines.length; i++) {
-            checkPageBreak(10)
-            yPosition += 6
-            pdf.text(descLines[i], 55, yPosition + 8)
-          }
-        }
-        
-        yPosition += 15
-      })
-      
-      yPosition += 10
-    }
-
-    // Material Tests Section
-    if (reportData.materialTests.length > 0) {
-      const sectionHeight = 30 + (reportData.materialTests.length * 30)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Material Testing', 20, yPosition)
-      yPosition += 10
-
-      reportData.materialTests.forEach((test: MaterialTest, index: number) => {
-        checkPageBreak(25)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(`${index + 1}. ${test.test_type}`, 25, yPosition)
-        yPosition += 8
-        pdf.setFont('helvetica', 'normal')
-        
-        // Display test description
-        const descLines = pdf.splitTextToSize(test.description, contentWidth - 40)
-        checkPageBreak(descLines.length * 6 + 10)
-        pdf.text(descLines, 30, yPosition)
-        yPosition += descLines.length * 6 + 5
-        
-        // Display test images if any
-        if (test.test_images && test.test_images.length > 0) {
-          yPosition += 5
-          pdf.setFont('helvetica', 'bold')
-          pdf.text('Test Images:', 25, yPosition)
-          yPosition += 8
-          
-          test.test_images.forEach((image, imgIndex) => {
-            checkPageBreak(100) // Leave space for image
-            try {
-              // Add image with max width of contentWidth - 40
-              pdf.addImage(image, 'JPEG', 30, yPosition, contentWidth - 40, 0)
-              yPosition += 60 // Approximate height for image
-            } catch (error) {
-              console.error('Error adding image to PDF:', error)
-            }
-          })
-        } else {
-          yPosition += 5
-        }
-      })
-      yPosition += 10
-    }
-
-    // Material Requirements Section
-    if (reportData.materialRequirements && reportData.materialRequirements.length > 0) {
-      const sectionHeight = 40 + (reportData.materialRequirements.length * 10)
-      checkSectionPageBreak(sectionHeight)
-      
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('Material Requirements', margin, yPosition)
-      yPosition += 10
-
-      // Create table header
-      pdf.setFillColor(240, 240, 240)
-      pdf.rect(margin, yPosition, contentWidth, 10, 'F')
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('S.No.', margin + 5, yPosition + 7)
-      pdf.text('Description', margin + 30, yPosition + 7)
-      yPosition += 12
-
-      // Add table rows
-      pdf.setFont('helvetica', 'normal')
-      reportData.materialRequirements.forEach((item, index) => {
-        checkPageBreak(15)
-        
-        // Draw row background for better readability
-        if (index % 2 === 0) {
-          pdf.setFillColor(250, 250, 250)
-          pdf.rect(margin, yPosition - 2, contentWidth, 10, 'F')
-        }
-        
-        // Draw cell borders
-        pdf.rect(margin, yPosition - 2, contentWidth, 10)
-        
-        // Add cell content
-        pdf.text((index + 1).toString(), margin + 8, yPosition + 5)
-        
-        // Split description to fit in cell
-        const descLines = pdf.splitTextToSize(item.description, contentWidth - 40)
-        let descY = yPosition + 5
-        
-        pdf.text(descLines[0], margin + 30, descY)
-        
-        // Handle multi-line descriptions
-        if (descLines.length > 1) {
-          for (let i = 1; i < descLines.length; i++) {
-            checkPageBreak(10)
-            yPosition += 6
-            pdf.text(descLines[i], margin + 35, yPosition + 5)
-          }
-        }
-        
-        yPosition += 12
-      })
-      
-      yPosition += 10
     }
 
     // Footer
@@ -582,18 +419,51 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }
     pdf.save(fileName)
   }
 
-  const shareViaWhatsApp = () => {
+  // Generate, attempt upload silently, always download locally
+  const downloadAndSavePDF = async () => {
     const pdf = generatePDF()
     const fileName = `DPR_${reportData.siteName.replace(/\s+/g, '_')}_${reportData.date}.pdf`
-    
-    const message = `Daily Progress Report for ${reportData.siteName} - ${reportData.date}`
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
-    
-    // Open WhatsApp with message
-    window.open(whatsappUrl, '_blank')
-    
-    // Also trigger download so user can manually attach
-    pdf.save(fileName)
+    try {
+      const { data: authData } = await supabase.auth.getUser()
+      const user = authData?.user
+      if (user) {
+        const blob = pdf.output('blob') as Blob
+        const filePath = `${user.id}/${fileName}`
+        const { error: uploadErr } = await supabase.storage.from('dpr').upload(filePath, blob, {
+          contentType: 'application/pdf',
+          upsert: true,
+        })
+        if (!uploadErr) {
+          const { data: pub } = supabase.storage.from('dpr').getPublicUrl(filePath)
+          const pdfUrl = pub?.publicUrl || null
+          try {
+            const { data: profileRow } = await supabase
+              .from('profiles')
+              .select('special_code')
+              .eq('id', user.id)
+              .single()
+            const special_code = (profileRow as any)?.special_code || null
+            const { error: insertErr } = await supabase.from('dpr_reports').insert({
+              user_id: user.id,
+              special_code,
+              report_date: reportData.date,
+              site_name: reportData.siteName,
+              pdf_url: pdfUrl,
+            })
+            if (insertErr) console.error(insertErr)
+          } catch (metaErr) {
+            console.error(metaErr)
+          }
+        } else {
+          console.error(uploadErr)
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      // Always download locally; no popups
+      pdf.save(fileName)
+    }
   }
 
   const shareViaEmail = () => {
@@ -634,11 +504,19 @@ export const PDFGenerator: React.FC<PDFGeneratorProps> = ({ reportData, onEdit }
         </button>
         
         <button
-          onClick={downloadPDF}
+          onClick={() => (window.location.href = '/dashboard/my-reports')}
+          className="flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          <Eye className="w-5 h-5" />
+          View Generated PDFs
+        </button>
+
+        <button
+          onClick={downloadAndSavePDF}
           className="flex items-center justify-center gap-2 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors md:col-span-1 lg:col-span-2"
         >
           <FileDown className="w-5 h-5" />
-          Download PDF
+          Download & Save
         </button>
       </div>
 

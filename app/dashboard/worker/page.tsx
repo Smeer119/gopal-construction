@@ -65,6 +65,14 @@ type Attendance = {
   pdf_url?: string;
 };
 
+type WorkerReport = {
+  id: string;
+  created_at: string;
+  user_id: string;
+  special_code: string | null;
+  pdf_url: string;
+};
+
 export default function WorkerAttendancePage() {
   const { toast } = useToast();
   const [workers, setWorkers] = useState<Worker[]>([]);
@@ -81,11 +89,14 @@ export default function WorkerAttendancePage() {
   const [userName, setUserName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [showCompanyDialog, setShowCompanyDialog] = useState(false);
+  const [specialCode, setSpecialCode] = useState<string | null>(null);
+  const [reports, setReports] = useState<WorkerReport[]>([]);
   const [editPayment, setEditPayment] = useState<{
     workerId: string;
     amount: string;
     description: string;
   } | null>(null);
+
   const [editingWorker, setEditingWorker] = useState<Worker | null>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: '100%', height: '600px' });
 
@@ -101,26 +112,25 @@ export default function WorkerAttendancePage() {
         } = await supabase.auth.getUser();
         setCurrentUser(user);
 
-        // Fetch user's name from profiles table
+        // Fetch user's name and special_code from profiles table
         if (user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name")
+            .select("full_name, special_code")
             .eq("id", user.id)
             .single();
           setUserName(profile?.full_name || "");
+          setSpecialCode(profile?.special_code ?? null);
         }
 
         // Load company name from localStorage
         const savedCompany = localStorage.getItem("companyName");
         if (savedCompany) setCompanyName(savedCompany);
 
-        // Load workers from Supabase
-        const { data: workersData, error } = await supabase
-          .from("workers")
-          .select("*");
-        if (!error && workersData) {
-          setWorkers(workersData);
+        // Load workers from localStorage
+        const savedWorkers = localStorage.getItem("workers_list");
+        if (savedWorkers) {
+          setWorkers(JSON.parse(savedWorkers));
         }
 
         // Load today's attendance from localStorage
@@ -129,6 +139,11 @@ export default function WorkerAttendancePage() {
         );
         if (savedAttendance) {
           setAttendance(JSON.parse(savedAttendance));
+        }
+
+        // Load previously generated reports for this user
+        if (user) {
+          await loadReports(user.id);
         }
       } catch (error) {
         console.error("Error loading data:", error);
@@ -190,7 +205,7 @@ export default function WorkerAttendancePage() {
     });
   };
 
-  // Add new worker to Supabase
+  // Add new worker to localStorage
   const addWorker = async () => {
     if (!newWorker.name || !newWorker.phone_number) {
       toast({
@@ -203,15 +218,11 @@ export default function WorkerAttendancePage() {
 
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("workers")
-        .insert([newWorker])
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setWorkers([...workers, data]);
+      const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto) ? crypto.randomUUID() : `${Date.now()}`;
+      const worker: Worker = { id, name: newWorker.name, phone_number: newWorker.phone_number };
+      const updated = [...workers, worker];
+      setWorkers(updated);
+      localStorage.setItem("workers_list", JSON.stringify(updated));
       setNewWorker({ name: "", phone_number: "" });
       setShowAddWorker(false);
       toast({
@@ -231,22 +242,15 @@ export default function WorkerAttendancePage() {
     }
   };
 
-  // Update worker in Supabase
+  // Update worker in localStorage
   const updateWorker = async () => {
     if (!editingWorker) return;
 
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from("workers")
-        .update(editingWorker)
-        .eq("id", editingWorker.id);
-
-      if (error) throw error;
-
-      setWorkers(
-        workers.map((w) => (w.id === editingWorker.id ? editingWorker : w))
-      );
+      const updated = workers.map((w) => (w.id === editingWorker.id ? editingWorker : w));
+      setWorkers(updated);
+      localStorage.setItem("workers_list", JSON.stringify(updated));
       setEditingWorker(null);
       toast({
         title: "Success",
@@ -264,19 +268,20 @@ export default function WorkerAttendancePage() {
     }
   };
 
-  // Delete worker from database
+  // Delete worker from localStorage
   const deleteWorker = async (workerId: string) => {
     try {
       setLoading(true);
-      const { error } = await supabase
-        .from("workers")
-        .delete()
-        .eq("id", workerId);
-
-      if (error) throw error;
-
-      setWorkers(workers.filter((w) => w.id !== workerId));
-      setAttendance(attendance.filter((a) => a.worker_id !== workerId));
+      const updated = workers.filter((w) => w.id !== workerId);
+      setWorkers(updated);
+      localStorage.setItem("workers_list", JSON.stringify(updated));
+      // Remove related attendance for this worker (for current date)
+      const newAttendance = attendance.filter((a) => a.worker_id !== workerId);
+      setAttendance(newAttendance);
+      localStorage.setItem(
+        `attendance_${dateFilter}`,
+        JSON.stringify(newAttendance)
+      );
       toast({
         title: "Success",
         description: "Worker deleted successfully",
@@ -298,76 +303,69 @@ export default function WorkerAttendancePage() {
     workerId: string,
     status: "present" | "absent"
   ) => {
-    const now = format(new Date(), "HH:mm");
-    const existingRecordIndex = attendance.findIndex(
-      (a) => a.worker_id === workerId && a.date === dateFilter
-    );
+    setAttendance(prev => {
+      const now = format(new Date(), "HH:mm");
+      const existingIndex = prev.findIndex(
+        a => a.worker_id === workerId && a.date === dateFilter
+      );
 
-    const newAttendance = {
-      id: `temp_${Date.now()}`,
-      worker_id: workerId,
-      date: dateFilter,
-      status,
-      clock_in: now, // Always set clock_in time
-      clock_out: undefined,
-    };
-
-    if (existingRecordIndex >= 0) {
-      // Update existing record
-      const updatedAttendance = [...attendance];
-      updatedAttendance[existingRecordIndex] = {
-        ...updatedAttendance[existingRecordIndex],
-        ...newAttendance,
-        payment: updatedAttendance[existingRecordIndex].payment,
+      const newRecord = {
+        id: `temp_${Date.now()}`,
+        worker_id: workerId,
+        date: dateFilter,
+        status,
+        clock_in: now, // Set current time as clock_in
+        // Preserve existing clock_out if present
+        ...(existingIndex >= 0 && { 
+          clock_out: prev[existingIndex].clock_out,
+          payment: prev[existingIndex].payment 
+        })
       };
-      setAttendance(updatedAttendance);
-    } else {
-      // Add new record
-      setAttendance([...attendance, newAttendance]);
-    }
 
-    if (status === "absent") {
-      // Auto-set payment for absent workers
-      setEditPayment({
-        workerId,
-        amount: "0",
-        description: "Marked absent on " + format(new Date(), "PP"),
-      });
-    }
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = { ...updated[existingIndex], ...newRecord };
+        return updated;
+      }
+      return [...prev, newRecord];
+    });
+
+    // Do not auto-open Add Payment on Absent click
   };
 
   // Update clock in/out times
   const updateClockTime = (
     workerId: string,
     field: "clock_in" | "clock_out",
-    value: string
+    value: string | null
   ) => {
-    const existingRecordIndex = attendance.findIndex(
-      (a) => a.worker_id === workerId && a.date === dateFilter
-    );
+    setAttendance(prev => {
+      const existingIndex = prev.findIndex(
+        a => a.worker_id === workerId && a.date === dateFilter
+      );
 
-    if (existingRecordIndex >= 0) {
-      const updatedAttendance = [...attendance];
-      updatedAttendance[existingRecordIndex] = {
-        ...updatedAttendance[existingRecordIndex],
-        [field]: value || undefined,
-        status: value
-          ? "present"
-          : updatedAttendance[existingRecordIndex].status,
-      };
-      setAttendance(updatedAttendance);
-    } else if (value) {
-      setAttendance([
-        ...attendance,
+      if (existingIndex >= 0) {
+        // Only update the specified time field, leave status and other fields unchanged
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          [field]: value || undefined
+        };
+        return updated;
+      }
+      
+      // If no record exists, create a new one with the time field and default status
+      return [
+        ...prev,
         {
           id: `temp_${Date.now()}`,
           worker_id: workerId,
           date: dateFilter,
-          status: "present",
-          [field]: value,
-        },
-      ]);
-    }
+          status: "present", // Default status, can be changed later
+          [field]: value || undefined
+        }
+      ];
+    });
   };
 
   // Update payment information
@@ -404,6 +402,16 @@ export default function WorkerAttendancePage() {
     }
 
     setEditPayment(null);
+  };
+
+  // Helper to load reports from DB for the current user
+  const loadReports = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("worker_report")
+      .select("id, created_at, user_id, special_code, pdf_url")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (!error && data) setReports(data as WorkerReport[]);
   };
 
   // Generate and save PDF report
@@ -560,10 +568,11 @@ export default function WorkerAttendancePage() {
       const fileName = `attendance_${dateFilter}_${Date.now()}.pdf`;
       const pdfBlob = doc.output("blob");
 
-      // Upload to storage
+      // Upload to storage (bucket: worker)
+      const storagePath = `${currentUser.id}/reports/${fileName}`;
       const { error: uploadError } = await supabase.storage
-        .from("worker.pdf")
-        .upload(`reports/${fileName}`, pdfBlob, {
+        .from("worker")
+        .upload(storagePath, pdfBlob, {
           contentType: "application/pdf",
           upsert: true
         });
@@ -572,15 +581,22 @@ export default function WorkerAttendancePage() {
 
       // Get public URL of the uploaded PDF
       const { data: urlData } = supabase.storage
-        .from("worker.pdf")
-        .getPublicUrl(`reports/${fileName}`);
+        .from("worker")
+        .getPublicUrl(storagePath);
 
-      // Update attendance records with PDF URL
-      const updatedAttendance = attendance.map((record) => ({
-        ...record,
-        pdf_url: record.date === dateFilter ? urlData.publicUrl : record.pdf_url,
-      }));
-      setAttendance(updatedAttendance);
+      // Insert a record into worker_report table
+      const insertPayload = {
+        user_id: currentUser.id,
+        special_code: specialCode,
+        pdf_url: urlData.publicUrl,
+      };
+      const { error: insertError } = await supabase
+        .from("worker_report")
+        .insert([insertPayload]);
+      if (insertError) throw insertError;
+
+      // Refresh reports list
+      await loadReports(currentUser.id);
 
       // Download PDF automatically
       doc.save(fileName);
@@ -589,7 +605,6 @@ export default function WorkerAttendancePage() {
         title: "Success",
         description: "PDF generated and saved successfully",
       });
-
     } catch (error) {
       console.error("PDF Generation Error:", error);
       toast({
@@ -781,7 +796,7 @@ export default function WorkerAttendancePage() {
         {/* Attendance Table */}
         <Card>
           <CardContent className="p-0">
-       <div className="overflow-auto max-h-[500px]">
+            <div className="overflow-auto max-h-[500px]">
               <div className="min-w-[800px] overflow-x-auto">
                 <Table>
                   <TableHeader className="sticky top-0 bg-background">
@@ -960,7 +975,7 @@ export default function WorkerAttendancePage() {
                   </TableBody>
                 </Table>
               </div>
-          </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -1067,35 +1082,37 @@ export default function WorkerAttendancePage() {
                       <TableHeader className="sticky top-0 bg-background">
                         <TableRow>
                           <TableHead>Date</TableHead>
-                          <TableHead>PDF</TableHead>
+                          <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {pdfDates.map((date) => {
-                          const pdfRecord = attendance.find(
-                            (a) => a.date === date && a.pdf_url
-                          );
-                          return (
-                            <TableRow key={date}>
-                              <TableCell>
-                                {format(parseISO(date), "MMMM dd, yyyy")}
-                              </TableCell>
-                              <TableCell>
+                        {reports.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell>
+                              {format(parseISO(r.created_at), "MMMM dd, yyyy p")}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() =>
-                                    setSelectedPdf(pdfRecord?.pdf_url || null)
-                                  }
-                                  className="w-full sm:w-auto"
+                                  onClick={() => setSelectedPdf(r.pdf_url)}
                                 >
                                   <FileText className="w-4 h-4 mr-2" />
-                                  View/Download
+                                  View
                                 </Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => window.open(r.pdf_url, "_blank")}
+                                >
+                                  <Download className="w-4 h-4 mr-2" />
+                                  Download
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </ScrollArea>

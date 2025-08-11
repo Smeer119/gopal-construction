@@ -65,9 +65,9 @@ export default function Navbar() {
               </>
             ) : (
               <div className="flex items-center space-x-4">
-                <span className="text-gray-700">
-                  {user.user_metadata?.name || user.email}
-                </span>
+                <Link href="/profile" className="text-gray-700 hover:underline transition-colors">
+  {user.user_metadata?.name || user.email}
+</Link>
                 <Button
                   onClick={handleSignOut}
                   variant="outline"
@@ -122,9 +122,13 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="flex flex-col space-y-4">
-                  <span className="text-gray-700 py-2">
-                    {user.user_metadata?.name || user.email}
-                  </span>
+                 <Link
+  href="/profile"
+  className="text-gray-700 py-2 hover:underline transition-colors"
+  onClick={closeMenu}
+>
+  {user.user_metadata?.name || user.email}
+</Link>
                   <Button
                     onClick={handleSignOut}
                     variant="outline"

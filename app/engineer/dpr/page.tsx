@@ -19,7 +19,7 @@ import Link from 'next/link'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 // ✅ DO THIS at the top of page.tsx
 import { MaterialRequirementSection, MaterialRequirement } from './components/MaterialRequirement'
-
+import { SiteInfoSection } from './components/SiteInfoSection'
 
 
 function App() {
@@ -42,6 +42,8 @@ function App() {
   const [tomorrowWork, setTomorrowWork] = useState<TomorrowWork[]>([])
   const [expensesData, setExpensesData] = useState<ExpensesData>({ pettyCash: [], expenses: [] })
   const [materialTests, setMaterialTests] = useState<MaterialTest[]>([])
+  // material requirement handlers
+  const [requirements, setRequirements] = useState<MaterialRequirement[]>([])
 
   // Save to localStorage for persistence
   useEffect(() => {
@@ -67,6 +69,7 @@ function App() {
         expenses: parsed.expensesData?.expenses || []
       })
       setMaterialTests(parsed.materialTests || [])
+      setRequirements(parsed.materialRequirements || [])
     }
   }, [])
 
@@ -84,7 +87,8 @@ function App() {
       todayWork,
       tomorrowWork,
       expensesData,
-      materialTests
+      materialTests,
+      materialRequirements: requirements
     }
     localStorage.setItem('dpr-data', JSON.stringify(data))
     
@@ -120,7 +124,7 @@ function App() {
   useEffect(() => {
     const interval = setInterval(saveData, 30000)
     return () => clearInterval(interval)
-  }, [siteName, date, weather, temperature, contractors, labours, equipment, visitors, issues, todayWork, tomorrowWork, expensesData, materialTests])
+  }, [siteName, date, weather, temperature, contractors, labours, equipment, visitors, issues, todayWork, tomorrowWork, expensesData, materialTests, requirements])
 
   // Helper function to generate unique IDs
   const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9)
@@ -226,49 +230,40 @@ function App() {
     setMaterialTests(materialTests.filter(t => t.id !== id))
   }
 
-  // material requirement handlers
-
-
-  const [requirements, setRequirements] = useState<MaterialRequirement[]>([])
-
-const addRequirement = (requirement: Omit<MaterialRequirement, 'id'>) => {
-  const newRequirement = {
-    id: Date.now().toString(), // or use uuid
-    ...requirement,
+  const addRequirement = (requirement: Omit<MaterialRequirement, 'id'>) => {
+    const newRequirement = {
+      id: Date.now().toString(), // or use uuid
+      ...requirement,
+    }
+    setRequirements((prev) => [...prev, newRequirement])
   }
-  setRequirements((prev) => [...prev, newRequirement])
-}
 
-const updateRequirement = (id: string, updated: Partial<MaterialRequirement>) => {
-  setRequirements((prev) =>
-    prev.map((req) => (req.id === id ? { ...req, ...updated } : req))
-  )
-}
+  const updateRequirement = (id: string, updated: Partial<MaterialRequirement>) => {
+    setRequirements((prev) =>
+      prev.map((req) => (req.id === id ? { ...req, ...updated } : req))
+    )
+  }
 
-const deleteRequirement = (id: string) => {
-  setRequirements((prev) => prev.filter((req) => req.id !== id))
-}
+  const deleteRequirement = (id: string) => {
+    setRequirements((prev) => prev.filter((req) => req.id !== id))
+  }
 
-
-const reportData = {
-  siteName,
-  date,
-  weather,
-  temperature,
-  contractors,
-  labours,
-  equipment,
-  visitors,
-  issues,
-  todayWork,
-  tomorrowWork,
-  expensesData,
-  materialTests,
-
-   materialRequirements: [] 
-};
-
-
+  const reportData = {
+    siteName,
+    date,
+    weather,
+    temperature,
+    contractors,
+    labours,
+    equipment,
+    visitors,
+    issues,
+    todayWork,
+    tomorrowWork,
+    expensesData,
+    materialTests,
+    materialRequirements: requirements
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -293,68 +288,18 @@ const reportData = {
                   </Button>
                 </Link>
               </div>
-
-              {/* Basic Information Form */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <FileText className="w-4 h-4 inline mr-1" />
-                    Site Name
-                  </label>
-                  <input
-                    type="text"
-                    value={siteName}
-                    onChange={(e) => setSiteName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter site name"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <Calendar className="w-4 h-4 inline mr-1" />
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <Cloud className="w-4 h-4 inline mr-1" />
-                    Weather
-                  </label>
-                  <select
-                    value={weather}
-                    onChange={(e) => setWeather(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="Sunny">Sunny</option>
-                    <option value="Cloudy">Cloudy</option>
-                    <option value="Rainy">Rainy</option>
-                    <option value="Stormy">Stormy</option>
-                    <option value="Windy">Windy</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    <Thermometer className="w-4 h-4 inline mr-1" />
-                    Temperature
-                  </label>
-                  <input
-                    type="text"
-                    value={temperature}
-                    onChange={(e) => setTemperature(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., 25°C"
-                  />
-                </div>
-              </div>
+              <SiteInfoSection
+                siteName={siteName}
+                date={date}
+                weather={weather}
+                temperature={temperature}
+                onUpdate={(u) => {
+                  if (u.siteName !== undefined) setSiteName(u.siteName)
+                  if (u.date !== undefined) setDate(u.date)
+                  if (u.weather !== undefined) setWeather(u.weather)
+                  if (u.temperature !== undefined) setTemperature(u.temperature)
+                }}
+              />
             </div>
 
             {/* Main Content Sections */}
@@ -370,11 +315,11 @@ const reportData = {
                 labours={labours}
                 onUpdateLabours={updateLabours}
               />
-                 <VisitorSection
-                visitors={visitors}
-                onAddVisitor={addVisitor}
-                onUpdateVisitor={updateVisitor}
-                onDeleteVisitor={deleteVisitor}
+              <TodayWorkSection
+                todayWork={todayWork}
+                onAddTodayWork={addTodayWork}
+                onUpdateTodayWork={updateTodayWork}
+                onDeleteTodayWork={deleteTodayWork}
               />
 
               <EquipmentSection
@@ -383,7 +328,7 @@ const reportData = {
                 onUpdateEquipment={updateEquipment}
                 onDeleteEquipment={deleteEquipment}
               />
-   <TomorrowWorkSection
+              <TomorrowWorkSection
                 tomorrowWork={tomorrowWork}
                 onAddTomorrowWork={addTomorrowWork}
                 onUpdateTomorrowWork={updateTomorrowWork}
@@ -412,15 +357,12 @@ const reportData = {
                 onUpdateIssue={updateIssue}
                 onDeleteIssue={deleteIssue}
               />
-
-              <TodayWorkSection
-                todayWork={todayWork}
-                onAddTodayWork={addTodayWork}
-                onUpdateTodayWork={updateTodayWork}
-                onDeleteTodayWork={deleteTodayWork}
+              <VisitorSection
+                visitors={visitors}
+                onAddVisitor={addVisitor}
+                onUpdateVisitor={updateVisitor}
+                onDeleteVisitor={deleteVisitor}
               />
-
-           
 
               <ExpensesSection
                 expensesData={expensesData}

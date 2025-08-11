@@ -94,6 +94,14 @@ type ChartData = {
 
 type TaskWithId = Omit<Task, 'id'> & { id?: string };
 
+type SchedulingReport = {
+  id: string;
+  user_id: string;
+  special_code: string | null;
+  pdf_url: string;
+  created_at: string;
+};
+
 export default function ConstructionSchedulingPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -109,6 +117,9 @@ export default function ConstructionSchedulingPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [pdfDimensions, setPdfDimensions] = useState({ width: "100%", height: "600px" });
   const [activeView, setActiveView] = useState<"chart" | "table">("chart");
+  const [notes, setNotes] = useState<string>("");
+  const [reports, setReports] = useState<SchedulingReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState<boolean>(false);
 
   // Load initial data
   useEffect(() => {
@@ -141,6 +152,35 @@ export default function ConstructionSchedulingPage() {
 
     loadData();
   }, [toast]);
+
+  // Load user's generated scheduling PDFs
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!currentUser) return;
+      try {
+        setReportsLoading(true);
+        const { data, error } = await supabase
+          .from('scheduling_report')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setReports((data || []) as SchedulingReport[]);
+      } catch (err) {
+        console.error('Error fetching scheduling reports:', err);
+        toast({
+          title: 'Error',
+          description: 'Failed to load your generated reports',
+          variant: 'destructive',
+        });
+      } finally {
+        setReportsLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, [currentUser, toast]);
 
   // Adjust PDF viewer dimensions based on window size
   useEffect(() => {
@@ -373,18 +413,29 @@ export default function ConstructionSchedulingPage() {
         author: currentUser.email || "System",
       });
 
+      // Include additional notes (if any)
+      if (notes && notes.trim().length > 0) {
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        const maxWidth = doc.internal.pageSize.getWidth() - 20; // margins
+        doc.text('Notes:', 10, 20);
+        doc.setFontSize(11);
+        const splitNotes = doc.splitTextToSize(notes.trim(), maxWidth);
+        doc.text(splitNotes, 10, 28);
+      }
+
       // Add title and metadata
       doc.setFontSize(18);
       doc.text(
         "Construction Project Schedule",
         doc.internal.pageSize.getWidth() / 2,
-        20,
+        40,
         { align: "center" }
       );
 
       doc.setFontSize(12);
-      doc.text(`Generated on: ${format(new Date(), "PPPP")}`, 20, 30);
-      doc.text(`Total Tasks: ${tasks.length}`, 20, 37);
+      doc.text(`Generated on: ${format(new Date(), "PPPP")}`, 20, 50);
+      doc.text(`Total Tasks: ${tasks.length}`, 20, 57);
 
       // Prepare table data
       const taskData = tasks.map((task) => [
@@ -400,7 +451,7 @@ export default function ConstructionSchedulingPage() {
 
       // Add table
       autoTable(doc, {
-        startY: 45,
+        startY: 60,
         head: [
           [
             "Main Category",
@@ -485,6 +536,42 @@ export default function ConstructionSchedulingPage() {
         }))
       );
 
+      // Fetch user's special_code from profiles and insert metadata into scheduling_report
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('special_code')
+          .eq('id', currentUser.id)
+          .single();
+        if (profileError) throw profileError;
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('scheduling_report')
+          .insert([
+            {
+              user_id: currentUser.id,
+              special_code: profile?.special_code ?? null,
+              pdf_url: urlData.publicUrl,
+            },
+          ])
+          .select()
+          .single();
+        if (insertError) throw insertError;
+
+        // Optimistically update local list
+        if (inserted) {
+          setReports((prev) => [inserted as SchedulingReport, ...prev]);
+        }
+      } catch (metaErr) {
+        console.error('Error saving scheduling report metadata:', metaErr);
+        // Non-blocking toast, since PDF is already generated & uploaded
+        toast({
+          title: 'Warning',
+          description: 'PDF saved, but failed to record metadata',
+          variant: 'destructive',
+        });
+      }
+
       // Download PDF automatically
       doc.save(fileName);
 
@@ -528,7 +615,7 @@ export default function ConstructionSchedulingPage() {
         
 
         {/* Scheduling Controls */}
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Main Category</Label>
             <Select onValueChange={handleMainCategoryChange} value={selectedMainCategory}>
@@ -572,17 +659,71 @@ export default function ConstructionSchedulingPage() {
 )}
 
 
-          <div className="flex items-end">
-            <Button
-              onClick={() => setShowGeneratedPDFs(true)}
-              variant="outline"
-              className="w-full"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              View Generated PDFs
-            </Button>
+          <div className="space-y-2">
+            <Label>Notes for this report</Label>
+            <Textarea
+              placeholder="Add any additional notes to include in the PDF..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="min-h-[80px]"
+            />
           </div>
         </div>
+
+        {/* View Generated PDFs Button */}
+        <div className="mb-6">
+          <Button
+            variant="outline"
+            onClick={() => setShowGeneratedPDFs(true)}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            View Generated PDFs
+          </Button>
+        </div>
+
+        {/* Generated PDFs Dialog */}
+        <Dialog open={showGeneratedPDFs} onOpenChange={setShowGeneratedPDFs}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Generated Schedule PDFs</DialogTitle>
+            </DialogHeader>
+            {reportsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            ) : reports.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No reports found.</p>
+            ) : (
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Special Code</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reports.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>{format(new Date(r.created_at), 'PPpp')}</TableCell>
+                        <TableCell>{r.special_code ?? '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <a href={r.pdf_url} target="_blank" rel="noopener noreferrer">
+                              <Button size="sm" variant="outline">View</Button>
+                            </a>
+                            <a href={r.pdf_url} download>
+                              <Button size="sm">Download</Button>
+                            </a>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       {/* Task Selection */}
 {selectedMainCategory && (
   <Card className="mb-6">

@@ -18,7 +18,7 @@ interface VisitorSectionProps {
 
 const visitorTypes = [
   'Customer', 'Owner', 'Client', 'Architect', 'Consultant', 
-  'Senior Manager', 'Vendor', 'Contractor', 'Inspector', 'Engineer'
+  'Senior Manager', 'Vendor', 'Contractor', 'PMC', 'Engineer'
 ]
 
 export const VisitorSection: React.FC<VisitorSectionProps> = ({

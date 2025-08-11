@@ -13,7 +13,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  ArrowLeft, Check, X, FileText, Trash2
+  ArrowLeft, Check, X, FileText, Trash2, Eye, Download
 } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
@@ -91,6 +91,57 @@ export default function ConstructionChecklistPage() {
   useEffect(() => {
     localStorage.setItem("multiChecklists", JSON.stringify(multiSelectedChecklists));
   }, [multiSelectedChecklists]);
+
+  // Load current user's generated PDFs
+  const loadGeneratedPdfs = async () => {
+    if (!currentUser) return;
+    const { data, error } = await supabase
+      .from("pourcards")
+      .select("id, file_path, date, description, created_at")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) {
+      console.error("Failed to load PDFs", error);
+      return;
+    }
+    setGeneratedPdfs(data || []);
+  };
+
+  useEffect(() => {
+    // when auth state is ready, fetch user's PDFs
+    if (currentUser) {
+      loadGeneratedPdfs();
+    }
+  }, [currentUser]);
+
+  const viewPdf = async (filePath: string) => {
+    // Use signed URL so bucket can remain private
+    const { data, error } = await supabase.storage
+      .from("pourcards")
+      .createSignedUrl(filePath, 60 * 60); // 1 hour
+    if (error || !data?.signedUrl) {
+      toast({ title: "Error", description: "Failed to create view link", variant: "destructive" });
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  };
+
+  const downloadPdf = async (filePath: string) => {
+    const { data, error } = await supabase.storage.from("pourcards").download(filePath);
+    if (error || !data) {
+      toast({ title: "Error", description: "Failed to download PDF", variant: "destructive" });
+      return;
+    }
+    const blobUrl = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filePath.split("/").pop() || "pourcard.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  };
 
   const handleAddChecklist = () => {
     let tasks: string[] = [];
@@ -216,12 +267,18 @@ export default function ConstructionChecklistPage() {
       });
 
       const pdfDate = multiSelectedChecklists[0]?.date || format(new Date(), "yyyy-MM-dd");
-      const pdfFileName = `pourcards_${pdfDate}.pdf`; // Fixed path: no nested folder
+      if (!currentUser?.id) {
+        throw new Error("User not authenticated");
+      }
+      // Store under a per-user folder to avoid collisions and simplify RLS
+      const pdfFileName = `${currentUser.id}/pourcards_${pdfDate}.pdf`;
 
-      // Upload PDF to Supabase Storage
+      // Upload PDF to Supabase Storage (build a robust Blob)
+      const arrayBuffer = doc.output("arraybuffer");
+      const pdfBlob = new Blob([arrayBuffer], { type: "application/pdf" });
       const { error: uploadError } = await supabase.storage
         .from("pourcards")
-        .upload(pdfFileName, doc.output("blob"), {
+        .upload(pdfFileName, pdfBlob, {
           contentType: "application/pdf",
           upsert: true,
         });
@@ -230,27 +287,26 @@ export default function ConstructionChecklistPage() {
         throw new Error(`Failed to upload PDF: ${uploadError.message}`);
       }
 
-      // Save PDF metadata to pourcards table (one entry per checklist)
-      const inserts = multiSelectedChecklists.map((checklist) => ({
-        user_id: currentUser?.id,
-        file_path: pdfFileName, // Use corrected path
-        main_topic: checklist.mainTopic,
-        sub_topic: checklist.subTopic,
-        date: checklist.date,
-        description: checklist.description,
-      }));
-
+      // Save a single metadata row per generated PDF
       const { error: insertError } = await supabase
         .from("pourcards")
-        .insert(inserts);
+        .insert({
+          user_id: currentUser.id,
+          file_path: pdfFileName,
+          date: pdfDate,
+          description: tempDescription || `${multiSelectedChecklists.length} checklist(s)`,
+        });
 
       if (insertError) {
         throw new Error(`Failed to save pourcard metadata: ${insertError.message}`);
       }
 
-      // Download the PDF
+      // Optional local download for the user
       doc.save(`pourcard_${pdfDate}.pdf`);
-      toast({ title: "Success", description: "PDF generated and saved to Supabase", variant: "default" });
+      toast({ title: "Success", description: "PDF generated and saved", variant: "default" });
+
+      // refresh list
+      loadGeneratedPdfs();
     } catch (err) {
     toast({
   title: "Error",
@@ -314,6 +370,48 @@ export default function ConstructionChecklistPage() {
                 {topic}
               </SelectItem>
             ))}
+
+        {/* Generated PDFs list */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Generated PDFs</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {generatedPdfs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No PDFs yet. Generate one to see it here.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>File</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {generatedPdfs.map((pdf: any) => (
+                      <TableRow key={pdf.id}>
+                        <TableCell>{pdf.date}</TableCell>
+                        <TableCell className="max-w-[360px] truncate">{pdf.description || "-"}</TableCell>
+                        <TableCell>{pdf.file_path}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="secondary" size="sm" onClick={() => viewPdf(pdf.file_path)}>
+                            <Eye className="w-4 h-4 mr-2" /> View
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadPdf(pdf.file_path)}>
+                            <Download className="w-4 h-4 mr-2" /> Download
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
           </SelectContent>
         </Select>
       </div>
