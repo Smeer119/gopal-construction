@@ -53,6 +53,9 @@ export default function SignupPage() {
 
       // Ask user to confirm email before proceeding
       setShowEmailSent(true)
+
+      // Redirect to landing page after signup
+      router.push('/')
     } catch (err: any) {
       setError(err.message || 'An error occurred during signup')
     } finally {

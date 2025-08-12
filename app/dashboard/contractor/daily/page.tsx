@@ -559,6 +559,21 @@ export default function MaterialManagementPage() {
     }
   }, []);
 
+  // Check if user is authenticated, if not redirect to landing page
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        window.location.href = '/';
+      }
+      // If user IS authenticated, also redirect to landing page
+      else {
+        window.location.href = '/';
+      }
+    };
+    checkAuth();
+  }, []);
+
   const saveMaterials = async (): Promise<void> => {
     if (materialsInProgress.length === 0) return;
 
@@ -1748,7 +1763,7 @@ export default function MaterialManagementPage() {
                                 </TableCell>
                               </TableRow>
                             ))
-                          ) : (
+                          : (
                             <TableRow>
                               <TableCell
                                 colSpan={3}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import {  useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import Link from 'next/link'
@@ -30,6 +30,300 @@ import {
   X,
   Loader2
 } from 'lucide-react'
+import React, { useState, useRef } from 'react';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+
+const services = [
+  {
+    id: 'ai-saas',
+    title: 'Ai/Saas/CMS/Cloud/iOT Services',
+    description: 'Smart digital solutions for construction management and automation.',
+    points: [
+      'Ai Construction Management Tools',
+      'Ai Work Scheduling',
+      'Ai Material Procurement',
+      'Ai Estimating',
+      'Ai BOQ',
+      'Ai Vastu',
+      'Ai Monitoring'
+    ],
+    image: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'pre-construction',
+    title: 'Pre-Construction & Site Preparation',
+    description: 'Prepare your site for successful construction.',
+    points: [
+      'Surveying & Marking',
+      'Site Clearance',
+      'Earthworks',
+      'Dewatering',
+      'Ground Improvement'
+    ],
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'planning-design',
+    title: 'Planning & Design',
+    description: 'Comprehensive design and planning services.',
+    points: [
+      'Layout',
+      'Concept/Schematic/Detailed Design',
+      '3D Modeling & Rendering',
+      'Interior Design',
+      'Structural Design',
+      'MEP Design',
+      'Infrastructure Design',
+      'Sustainable/Green Building Design',
+      'Facade Design'
+    ],
+    image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'project-management',
+    title: 'Project Management & Coordination',
+    description: 'Efficient project management and coordination.',
+    points: [
+      'Project Coordinators',
+      'Scheduling',
+      'Construction Management (Hybrid)',
+      'Remote Site Monitoring'
+    ],
+    image: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=1926&q=80'
+  },
+  {
+    id: 'site-monitoring',
+    title: 'Site Monitoring & Progress Tracking',
+    description: 'Track progress and ensure quality on site.',
+    points: [
+      'Project Coordinators',
+      'Scheduling',
+      'Construction Management (Hybrid)',
+      'Remote Site Monitoring',
+      'Quality Inspection',
+      'Site Safety Management'
+    ],
+    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'costing-estimation',
+    title: 'Costing & Estimation',
+    description: 'Accurate cost estimation and BOQ preparation.',
+    points: [
+      'Quantity Surveying',
+      'BOQ Preparation',
+      'Cost Engineering'
+    ],
+    image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2031&q=80'
+  },
+  {
+    id: 'tendering-contracts',
+    title: 'Tendering & Contracts',
+    description: 'Professional tendering and contract management.',
+    points: [
+      'Quantity Surveying',
+      'BOQ Preparation',
+      'Cost Engineering'
+    ],
+    image: 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?ixlib=rb-4.0.3&auto=format&fit=crop&w=1926&q=80'
+  },
+  {
+    id: 'structural-works',
+    title: 'Structural Works',
+    description: 'Robust structural construction services.',
+    points: [
+      'RCC Works',
+      'Concrete Works',
+      'Masonry Works',
+      'Brickwork & Plastering',
+      'UCR / Stone / Plum Concrete Works',
+      'Rebaring',
+      'Scaffolding Erection & Dismantling',
+      'PEB Structure Erection',
+      'Retrofitting & Strengthening'
+    ],
+    image: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2031&q=80'
+  },
+  {
+    id: 'finishing-works',
+    title: 'Finishing Works',
+    description: 'High-quality finishing for your project.',
+    points: [
+      'Flooring Installation',
+      'Tiling & Grouting',
+      'Painting',
+      'Waterproofing',
+      'ACP Sheeting Installation',
+      'Glass Installation',
+      'Carpentry & Furniture Installation',
+      'Ceiling Works'
+    ],
+    image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'mep-utilities',
+    title: 'MEP & Utilities Installation',
+    description: 'Expert installation of MEP and utilities.',
+    points: [
+      'Plumbing Works',
+      'Electrical works',
+      'Fire Safety System Installation',
+      'Lift installation',
+      'HVAC',
+      'STP/WTP Plant Installation',
+      'Mechanical Fabrication & Erection'
+    ],
+    image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  },
+  {
+    id: 'demolition-hse',
+    title: 'Demolition, Breaking & Core Works',
+    description: 'Safe demolition and HSE documentation.',
+    points: [
+      'Health, Safety & Environmental (HSE) Documentation'
+    ],
+    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
+  }
+];
+
+const ServicesSection = () => {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  // Auto-slide every 4 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % services.length);
+      if (scrollContainerRef.current) {
+        const slideWidth = scrollContainerRef.current.children[0]?.clientWidth || 0;
+        const gap = 24;
+        scrollContainerRef.current.scrollTo({
+          left: ((currentSlide + 1) % services.length) * (slideWidth + gap),
+          behavior: 'smooth'
+        });
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [currentSlide]);
+
+  const scrollToSlide = (index: number) => {
+    if (scrollContainerRef.current) {
+      const slideWidth = scrollContainerRef.current.children[0]?.clientWidth || 0;
+      const gap = 24;
+      scrollContainerRef.current.scrollTo({
+        left: index * (slideWidth + gap),
+        behavior: 'smooth'
+      });
+    }
+    setCurrentSlide(index);
+  };
+
+  const nextSlide = () => {
+    const next = currentSlide === services.length - 1 ? 0 : currentSlide + 1;
+    scrollToSlide(next);
+  };
+
+  const prevSlide = () => {
+    const prev = currentSlide === 0 ? services.length - 1 : currentSlide - 1;
+    scrollToSlide(prev);
+  };
+
+  return (
+    <div className="py-20 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-bold text-black mb-4">
+            Our Services
+          </h2>
+          <p className="text-xl text-gray-800 max-w-3xl mx-auto font-medium">
+            Need construction help? Ping us.
+          </p>
+        </div>
+        <div className="relative">
+          <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4" ref={scrollContainerRef}>
+            {services.map((service, index) => (
+              <div
+                key={service.id}
+                className={`min-w-[300px] sm:min-w-[350px] lg:min-w-[400px] p-4 snap-center transition-transform duration-300 relative`}
+                onMouseEnter={() => setHovered(index)}
+                onMouseLeave={() => setHovered(null)}
+                style={{
+                  transform: index === currentSlide ? 'scale(1.08)' : 'scale(0.95)',
+                  opacity: index === currentSlide ? 1 : 0.7,
+                  zIndex: index === currentSlide ? 2 : 1,
+                  boxShadow: index === currentSlide
+                    ? '0 0 0 4px #a3e635, 0 8px 32px rgba(0,0,0,0.12)'
+                    : '0 2px 12px rgba(0,0,0,0.08)'
+                }}
+              >
+                <div className="bg-white rounded-lg shadow-md overflow-hidden relative h-full flex flex-col">
+                  <div className="relative">
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      width={400}
+                      height={250}
+                      className="w-full h-56 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black opacity-30"></div>
+                    <div className={`absolute inset-0 flex items-center justify-center`}>
+                      <h3 className={`text-xl font-bold text-gray-900 text-center px-2 transition-colors duration-300 ${index === currentSlide ? 'text-lime-700' : 'text-gray-900'}`}>
+                        {service.title}
+                      </h3>
+                    </div>
+                    {/* Navigation Buttons on Card */}
+                    <div className="absolute top-2 right-2 flex gap-2">
+                      <button
+                        onClick={nextSlide}
+                        className="p-2 rounded-full bg-black text-white shadow-md hover:bg-gray-800 transition-colors"
+                        aria-label="Next Slide"
+                        tabIndex={-1}
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="absolute top-2 left-2 flex gap-2">
+                      <button
+                        onClick={prevSlide}
+                        className="p-2 rounded-full bg-black text-white shadow-md hover:bg-gray-800 transition-colors"
+                        aria-label="Previous Slide"
+                        tabIndex={-1}
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-4 flex-1">
+                    <p className="text-gray-900 text-sm mb-4 font-semibold">
+                      {service.description}
+                    </p>
+                    <ul
+                      className={`transition-all duration-300 ${
+                        hovered === index || index === currentSlide ? 'opacity-100' : 'opacity-80'
+                      }`}
+                    >
+                      {service.points.map((point, idx) => (
+                        <li
+                          key={idx}
+                          className="text-gray-800 text-sm mb-2 flex items-start font-medium"
+                        >
+                          <span className="w-2 h-2 bg-lime-400 rounded-full mr-2 mt-1 flex-shrink-0"></span>
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Removed horizontal line/dots navigation below the cards */}
+      </div>
+    </div>
+  );
+};
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -44,30 +338,25 @@ export default function Home() {
   ])
 
   useEffect(() => {
-    checkUser()
-  }, [])
+    checkUser();
+  }, []);
 
   const checkUser = async () => {
-    const currentUser = await getCurrentUser()
-    setUser(currentUser)
-    setLoading(false)
-  }
+    const currentUser = await getCurrentUser();
+    setUser(currentUser);
+    setLoading(false);
+    // Remove redirect here so user stays on landing page after login/signup
+    // Do NOT call router.push('/') here
+  };
 
   const handleHeroClick = () => {
     if (!user) {
-      router.push('/signup')
+      router.push('/signup');
     } else {
-      const userType = user.user_metadata?.user_type
-      const role = user.user_metadata?.role
-      
-      if (userType === 'industry' && role) {
-        router.push(`/dashboard/${role}`)
-      } else {
-        router.push('/select-role')
-      }
+      // After login, stay on landing page (do not redirect to dashboard)
+      // Optionally, you can show a toast or message
     }
-  }
- 
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -219,142 +508,10 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Our Services Section (Accordion FAQ) */}
-      <section id="services" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl sm:text-4xl font-bold text-black mb-3">Our Services</h2>
-            <p className="text-lg text-gray-600">Expand a section to view details.</p>
-          </div>
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="ai-saas">
-              <AccordionTrigger>AI / SaaS / CMS / Cloud / IoT Services</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>AI Construction Management Tools</li>
-                  <li>AI Work Scheduling</li>
-                  <li>AI Material Procurement</li>
-                  <li>AI Estimating</li>
-                  <li>AI BOQ</li>
-                  <li>AI Vastu</li>
-                  <li>AI Monitoring</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="preconstruction">
-              <AccordionTrigger>Pre-Construction & Site Preparation</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Surveying & Marking</li>
-                  <li>Site Clearance</li>
-                  <li>Earthworks</li>
-                  <li>Dewatering</li>
-                  <li>Ground Improvement</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="planning-design">
-              <AccordionTrigger>Planning & Design</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Layout</li>
-                  <li>Concept / Schematic / Detailed Design</li>
-                  <li>3D Modeling & Rendering</li>
-                  <li>Interior, Structural, MEP, Infrastructure, Facade</li>
-                  <li>Sustainable / Green Building Design</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="pmc">
-              <AccordionTrigger>Project Management & Coordination</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Project Coordinators</li>
-                  <li>Scheduling</li>
-                  <li>Construction Management (Hybrid)</li>
-                  <li>Remote Site Monitoring</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="site-monitoring">
-              <AccordionTrigger>Site Monitoring & Progress Tracking</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Quality Inspection</li>
-                  <li>Site Safety Management</li>
-                  <li>Material Tracking</li>
-                  <li>Issue Tracking & NCR</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="costing">
-              <AccordionTrigger>Costing & Estimation</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Quantity Surveying</li>
-                  <li>BOQ Preparation</li>
-                  <li>Cost Engineering</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="tendering">
-              <AccordionTrigger>Tendering & Contracts</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Preparation of Tender Documents</li>
-                  <li>Bid Submission</li>
-                  <li>Negotiation Support</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="structural">
-              <AccordionTrigger>Structural Works</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>RCC / Concrete / Masonry</li>
-                  <li>Brickwork & Plastering</li>
-                  <li>Stone / Plum Concrete</li>
-                  <li>Rebaring, Scaffolding, PEB Erection</li>
-                  <li>Retrofitting & Strengthening</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="finishing">
-              <AccordionTrigger>Finishing Works</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Flooring, Tiling & Grouting</li>
-                  <li>Painting</li>
-                  <li>ACP / Glass Installation</li>
-                  <li>Carpentry & Furniture</li>
-                  <li>Ceiling & Waterproofing</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="mep">
-              <AccordionTrigger>MEP & Utilities Installation</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Plumbing & Electrical Works</li>
-                  <li>Fire Safety System, Lift Installation</li>
-                  <li>HVAC</li>
-                  <li>STP/WTP Plant Installation</li>
-                  <li>Mechanical Fabrication & Erection</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="demo-hse">
-              <AccordionTrigger>Demolition, Breaking & Core Works</AccordionTrigger>
-              <AccordionContent>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>Demolition, Breaking & Core Works</li>
-                  <li>HSE Documentation</li>
-                </ul>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
-      </section>
+      {/* Insert ServicesSection as a component */}
+      <ServicesSection />
+
+      {/* More Powerful Features Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -766,6 +923,3 @@ export default function Home() {
     </div>
   )
 }
-
-
-

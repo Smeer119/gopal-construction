@@ -57,7 +57,7 @@ export default function LoginPage() {
     if (userType === 'industry' && role) {
       router.push(`/dashboard/${role}`)
     } else {
-      router.push('/dashboard')
+      router.push('/')
     }
   }
 
@@ -106,7 +106,7 @@ export default function LoginPage() {
         if (userType === 'industry' && role) {
           router.push(`/dashboard/${role}`)
         } else {
-          router.push('/dashboard')
+          router.push('/')
         }
       }
     } catch (err: any) {
