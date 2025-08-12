@@ -567,39 +567,68 @@ export default function Home() {
       </section>
 
       {/* Floating AI Chatbot */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {!chatOpen && (
-          <Button onClick={() => setChatOpen(true)} className="rounded-full h-12 w-12 p-0 shadow-lg">
-            <MessageCircle className="w-6 h-6" />
-          </Button>
-        )}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end space-y-3">
+        {/* Chat Toggle Button */}
+        <button
+          onClick={() => setChatOpen(!chatOpen)}
+          className={`rounded-full h-14 w-14 flex items-center justify-center shadow-xl transition-all duration-300 ${
+            chatOpen ? 'bg-gray-200 text-gray-800' : 'bg-black text-white hover:bg-gray-800'
+          }`}
+          aria-label={chatOpen ? 'Close chat' : 'Open chat'}
+        >
+          {chatOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+        </button>
+
+        {/* Chat Window */}
         {chatOpen && (
-          <div className="w-[340px] sm:w-[380px] bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-black text-white">
-              <div className="font-semibold">Construction Assistant</div>
-              <button onClick={() => setChatOpen(false)} aria-label="Close" className="opacity-80 hover:opacity-100">
+          <div
+            className="transform transition-all duration-300 ease-in-out w-[90vw] max-w-md bg-white rounded-xl shadow-2xl overflow-hidden border border-gray-200 flex flex-col"
+            style={{ maxHeight: 'calc(100vh - 200px)' }}
+          >
+            {/* Chat Header */}
+            <div className="bg-black text-white px-5 py-3 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <div className="font-semibold">Construction Assistant</div>
+              </div>
+              <button
+                onClick={() => setChatOpen(false)}
+                className="text-gray-300 hover:text-white transition-colors"
+                aria-label="Close chat"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="max-h-[50vh] overflow-y-auto p-4 space-y-3">
+
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {chatMessages.map((m, idx) => (
-                <div key={idx} className={m.role === 'assistant' ? 'text-sm text-gray-800' : 'text-sm text-black'}>
-                  {m.role === 'assistant' ? (
-                    <div className="bg-gray-100 p-3 rounded-lg whitespace-pre-wrap">
-                      {m.content}
-                    </div>
-                  ) : (
-                    <div className="bg-black text-white p-3 rounded-lg whitespace-pre-wrap ml-auto max-w-[85%]">
-                      {m.content}
-                    </div>
-                  )}
+                <div
+                  key={idx}
+                  className={`flex ${
+                    m.role === 'assistant' ? 'justify-start' : 'justify-end'
+                  }`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
+                      m.role === 'assistant'
+                        ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
+                        : 'bg-black text-white rounded-br-none'
+                    }`}
+                  >
+                    {m.content}
+                  </div>
                 </div>
               ))}
               {chatLoading && (
-                <div className="text-sm text-gray-800">
-                  <div className="bg-gray-100 p-3 rounded-lg inline-flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Thinking...
+                <div className="flex justify-start">
+                  <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-gray-800 flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span>Thinking...</span>
                   </div>
                 </div>
               )}
@@ -682,7 +711,7 @@ export default function Home() {
               })()}
             </div>
             <form
-              className="flex items-center gap-2 p-3 border-t bg-white"
+              className="w-full p-3 border-t bg-white relative"
               onSubmit={async (e) => {
                 e.preventDefault()
                 if (!chatInput.trim() || chatLoading) return
@@ -690,6 +719,13 @@ export default function Home() {
                 setChatMessages(prev => [...prev, { role: 'user', content: userMsg }])
                 setChatInput('')
                 setChatLoading(true)
+                
+                // Auto-scroll to bottom when new message is added
+                const chatContainer = document.querySelector('.chat-messages')
+                if (chatContainer) {
+                  chatContainer.scrollTop = chatContainer.scrollHeight
+                }
+                
                 try {
                   // Build full conversation for better context (server will add system)
                   const convo = [...chatMessages, { role: 'user' as const, content: userMsg }]
@@ -701,6 +737,7 @@ export default function Home() {
                   const text = await resp.text()
                   let data: any
                   try { data = JSON.parse(text) } catch { data = undefined }
+                  
                   if (!resp.ok) {
                     let errMsg = (data?.error || 'AI error') + (data?.details ? `\n\nDetails: ${typeof data.details === 'string' ? data.details : JSON.stringify(data.details)}` : '')
                     if (String(errMsg).toLowerCase().includes('api key is not configured')) {
@@ -715,31 +752,61 @@ export default function Home() {
                   setChatMessages(prev => [...prev, { role: 'assistant', content: 'There was an error contacting the AI service.' }])
                 } finally {
                   setChatLoading(false)
+                  // Auto-scroll to bottom after response
+                  setTimeout(() => {
+                    const chatContainer = document.querySelector('.chat-messages')
+                    if (chatContainer) {
+                      chatContainer.scrollTop = chatContainer.scrollHeight
+                    }
+                  }, 100)
                 }
               }}
             >
-              <input
-                className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
-                placeholder="Ask construction questions…"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-              />
-              <Button type="submit" disabled={chatLoading} className="px-3">
-                <Send className="w-4 h-4" />
-              </Button>
+              <div className="relative flex items-center">
+                <input
+                  className="w-full pr-12 pl-4 py-3 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all duration-200"
+                  placeholder="Ask me anything about construction..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (chatInput.trim() && !chatLoading) {
+                        e.currentTarget.form?.requestSubmit()
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || chatLoading}
+                  className={`absolute right-2 p-1.5 rounded-full transition-colors ${
+                    chatInput.trim() && !chatLoading
+                      ? 'bg-black text-white hover:bg-gray-800'
+                      : 'text-gray-400 cursor-not-allowed'
+                  }`}
+                  aria-label="Send message"
+                >
+                  {chatLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
             </form>
           </div>
         )}
       </div>
 
       {/* Benefits Section */}
-    <section
-      className={cn(
-        "bg-gradient-to-r from-yellow-50 via-yellow to-white",
-        "py-12 sm:py-16 lg:py-20"
-      )}
-    >
-      <div
+      <section
+        className={cn(
+          "bg-gradient-to-r from-yellow-50 via-yellow to-white",
+          "py-12 sm:py-16 lg:py-20"
+        )}
+      >
+        <div
         className={cn(
           "max-w-7xl mx-auto",
           "px-4 sm:px-6 lg:px-8",
