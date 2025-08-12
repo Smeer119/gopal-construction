@@ -20,19 +20,19 @@ const roleConfig = {
   engineer: {
     icon: Wrench,
     title: 'Engineer',
-    description: 'Review site logs, manage technical tasks, and system maintenance',
+    description: 'Create & Share On Site Reports, Schedule And Checklist ',
     color: 'border-blue-200 hover:border-blue-300'
   },
   contractor: {
     icon: User,
-    title: 'Contractor',
-    description: 'View project timelines, manage tasks, and coordinate teams',
+    title: 'Store Manager',
+    description: 'On/Off-Site Material Management And Inventory.',
     color: 'border-green-200 hover:border-green-300'
   },
   worker: {
     icon: HardHat,
     title: 'Worker',
-    description: 'Mark attendance, check schedules, and view daily tasks',
+    description: 'Create & Share Daily Logs,Timing & Cash Reports.',
     color: 'border-yellow-200 hover:border-yellow-300'
   }
 }

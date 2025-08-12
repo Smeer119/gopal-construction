@@ -558,11 +558,12 @@ export default function WorkerAttendancePage() {
       doc.setFontSize(10);
       doc.setTextColor(150);
       doc.text(
-        `${companyName || "Company"} - Worker Management System`,
+        "buildkaam - Worker Management System",
         doc.internal.pageSize.getWidth() / 2,
         doc.internal.pageSize.getHeight() - 5,
         { align: "center" }
       );
+      
 
       // Generate PDF file name
       const fileName = `attendance_${dateFilter}_${Date.now()}.pdf`;

@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowLeft, Mail } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false)
@@ -20,7 +21,14 @@ export default function SignupPage() {
     password: '',
     confirmPassword: ''
   })
+  const [industryData, setIndustryData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    description: ''
+  })
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const router = useRouter()
 
   const handleInputChange = (field: string, value: string) => {
@@ -28,12 +36,38 @@ export default function SignupPage() {
     setError('')
   }
 
+  const handleIndustryChange = (field: keyof typeof industryData, value: string) => {
+    setIndustryData(prev => ({ ...prev, [field]: value }))
+    setError('')
+    setInfo('')
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setInfo('')
 
     try {
+      if (userType === 'industry') {
+        // Industry upcoming: collect interest instead of creating account
+        if (!industryData.name || !industryData.email || !industryData.phone || !industryData.description) {
+          throw new Error('Please fill all fields: name, email, phone, description')
+        }
+        const res = await fetch('/api/industry-interest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(industryData)
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          throw new Error(j.error || 'Failed to send your request')
+        }
+        setInfo('Thanks! We received your request. For now, please sign up or log in as an Individual. We will reach out to you shortly.')
+        setIndustryData({ name: '', email: '', phone: '', description: '' })
+        return
+      }
+
       if (!formData.email || !formData.password || !formData.confirmPassword) {
         throw new Error('Please fill in all fields')
       }
@@ -106,6 +140,11 @@ export default function SignupPage() {
                     <p className="text-red-600 text-sm">{error}</p>
                   </div>
                 )}
+                {info && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-green-700 text-sm">{info}</p>
+                  </div>
+                )}
 
                 <div className="mb-2">
                   <div className="grid w-full grid-cols-2 bg-muted rounded-md p-1">
@@ -114,49 +153,104 @@ export default function SignupPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    required
-                  />
-                </div>
+                {userType === 'industry' ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="iname">Name</Label>
+                      <Input
+                        id="iname"
+                        placeholder="Your full name"
+                        value={industryData.name}
+                        onChange={(e) => handleIndustryChange('name', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="iemail">Email</Label>
+                      <Input
+                        id="iemail"
+                        type="email"
+                        placeholder="your@email.com"
+                        value={industryData.email}
+                        onChange={(e) => handleIndustryChange('email', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="iphone">Phone</Label>
+                      <Input
+                        id="iphone"
+                        type="tel"
+                        placeholder="Your phone number"
+                        value={industryData.phone}
+                        onChange={(e) => handleIndustryChange('phone', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="idesc">Tell us what you need</Label>
+                      <Textarea
+                        id="idesc"
+                        placeholder="Describe the features you need or the problems you're solving"
+                        value={industryData.description}
+                        onChange={(e) => handleIndustryChange('description', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {loading ? 'Sending…' : 'Send Request'}
+                    </Button>
+                    <p className="text-xs text-gray-600 text-center">
+                      Industry access is an upcoming feature. After sending, please use the Individual option for now.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Create a password"
-                    value={formData.password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    required
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        placeholder="Create a password"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Re-enter your password"
-                    value={formData.confirmPassword}
-                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                    required
-                  />
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Confirm Password</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder="Re-enter your password"
+                        value={formData.confirmPassword}
+                        onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                        required
+                      />
+                    </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full" 
-                  disabled={loading}
-                >
-                  {loading ? 'Creating Account...' : 'Create Account'}
-                </Button>
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={loading}
+                    >
+                      {loading ? 'Creating Account...' : 'Create Account'}
+                    </Button>
+                  </>
+                )}
               </form>
               )}
 

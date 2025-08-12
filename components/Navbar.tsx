@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { Menu, X, LogOut } from 'lucide-react'
+import { Menu, X, LogOut, Bot } from 'lucide-react'
 import { getCurrentUser, signOut } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
 
@@ -58,7 +58,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <Image src="/logo.png" alt="BuildKaam" width={36} height={36} className="rounded-md" />
-            <span className="font-semibold text-xl text-black">BuildKaam</span>
+            <span className="font-semibold text-xl text-black">buildkaam</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -128,6 +128,21 @@ export default function Navbar() {
               </Link>
               {!user ? (
                 <>
+                  <Link
+                    href="/pricing"
+                    className="text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-white"
+                    onClick={closeMenu}
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    href="/ai-chat"
+                    className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-white"
+                    onClick={closeMenu}
+                  >
+                    <Bot className="h-4 w-4" />
+                    AI Assistant
+                  </Link>
                   <Link
                     href="/login"
                     className="text-gray-700 hover:text-black transition-colors py-2"

@@ -16,7 +16,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 // ✅ DO THIS at the top of page.tsx
 import { MaterialRequirementSection, MaterialRequirement } from './components/MaterialRequirement'
 import { SiteInfoSection } from './components/SiteInfoSection'
@@ -24,7 +23,7 @@ import { SiteInfoSection } from './components/SiteInfoSection'
 
 function App() {
   const [showPreview, setShowPreview] = useState(false)
-  const supabase = createClientComponentClient()
+  // Note: DPR form data persists only in localStorage. PDFs are uploaded to Supabase in PDFGenerator.
   
   // Basic report information
   const [siteName, setSiteName] = useState('Construction Site Alpha')
@@ -91,24 +90,6 @@ function App() {
       materialRequirements: requirements
     }
     localStorage.setItem('dpr-data', JSON.stringify(data))
-    
-    // Also save to Supabase if user is authenticated
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { error } = await supabase
-          .from('dpr_drafts')
-          .upsert({
-            user_id: user.id,
-            report_data: data,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id' })
-
-        if (error) throw error
-      }
-    } catch (error) {
-      console.error('Error saving to Supabase:', error)
-    }
     
     // Visual feedback
     const button = document.getElementById('save-button')
@@ -396,7 +377,7 @@ function App() {
             
             {/* Footer */}
             <div className="mt-12 text-center text-gray-500 text-sm pb-8">
-              <p>DPR Management System - Built for Construction Excellence</p>
+              <p>DPR Management System - buildkaam</p>
             </div>
           </>
         ) : (

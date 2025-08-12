@@ -20,8 +20,8 @@ interface TodayWorkSectionProps {
 }
 
 const workCategories = [
-  'Earthwork', 'Concrete', 'BBS', 'Tiling', 'Interior', 'Electrical',
-  'Plumbing', 'Painting', 'Masonry', 'Steel Work', 'Carpentry', 'Roofing'
+  'Earthwork', 'Levelling/Surveying ', 'Concrete ', 'BBS Work', 'Shuttering/Scaffolding ', 'Brickwork/Masonry Work',
+  'Plaster', 'Tilling ', 'Trimix ', 'Interior ', 'PEB/ Structural Work', 'Framing ','Roofing ','Painting ','Fabrication ','Furniture ','Doors/Windows/Glasswork','Electrical ','Plumbing ','Fireline','Other'
 ]
 
 export const TodayWorkSection: React.FC<TodayWorkSectionProps> = ({

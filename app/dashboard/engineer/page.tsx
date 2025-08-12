@@ -14,7 +14,7 @@ export default function EngineerDashboard() {
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Engineer Dashboard</h2>
           <p className="text-gray-600">
-            Review site logs, manage technical tasks, and monitor system performance
+          Create, Review , Share And Save All Daily Site Progress , Task Scheduling , Checklist And Pourcard
           </p>
         </div>
 
@@ -31,7 +31,7 @@ export default function EngineerDashboard() {
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-sm text-gray-600 mb-4">
-                  Track daily project progress and milestones
+                Fill, Share, Save & Download Reports Instantly.
                 </p>
                 <Button className="w-full">
                   View DPR
@@ -47,11 +47,11 @@ export default function EngineerDashboard() {
                   <Calendar className="w-8 h-8 text-green-600" />
                 </div>
                 <CardTitle className="text-xl">Scheduling</CardTitle>
-                <CardDescription>Project Timeline Management</CardDescription>
+                <CardDescription>Project Scheduling</CardDescription>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-sm text-gray-600 mb-4">
-                  Manage project schedules and resource allocation
+                Plan, Assign And Track Project Stages.
                 </p>
                 <Button className="w-full">
                   View Schedule
@@ -66,12 +66,12 @@ export default function EngineerDashboard() {
                 <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <TrendingUp className="w-8 h-8 text-purple-600" />
                 </div>
-                <CardTitle className="text-xl">Forecasting</CardTitle>
-                <CardDescription>Project Analytics & Predictions</CardDescription>
+                <CardTitle className="text-xl">Checklist  </CardTitle>
+                <CardDescription>Project Checklist</CardDescription>
               </CardHeader>
               <CardContent className="text-center">
                 <p className="text-sm text-gray-600 mb-4">
-                  Analyze trends and forecast project outcomes
+                Fill ,Check And Share Pourcards.
                 </p>
                 <Button className="w-full">
                   View Forecasts

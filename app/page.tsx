@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth'
 import Link from 'next/link'
 import Image from 'next/image'
 import Navbar from '@/components/Navbar'
+import { FloatingAIButton } from '@/components/FloatingAIButton'
 import { Button } from '@/components/ui/button'
 import { ThumbsUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -426,14 +427,14 @@ export default function Home() {
       {/* Use HeroSection for hero area, keep all logic and content as is */}
       <HeroSection
         badge={{
-          text: "Skip The Paperwork. Let's BUILDKAAM. ",
+          text: "Build For Builders, Engineers,Architectures, Contractors,Consultants. ",
           action: {
             text: "Learn more",
             href: "/",
           },
         }}
         title="Empowering Construction Teams with Smart Dashboards"
-        description="From site updates to digital attendance, manage your workforce, materials, and reports — all in one platform."
+        description="Skip The Paperwork. Let's BUILDKAAM. From site updates to digital attendance, manage your workforce, materials, and reports — all in one platform."
         actions={[
           // Dashboard button logic
           user && {
@@ -442,11 +443,12 @@ export default function Home() {
             variant: "default",
             icon: <ArrowRight className="ml-2 w-5 h-5" />,
           },
+        
           // Profile button logic
           user && {
             text: "Profile",
             href: "/profile",
-            variant: "default",
+            variant: "outline",
             icon: <Users className="ml-2 w-5 h-5" />,
           },
           // If not logged in, show Get Started and Sign In
@@ -854,9 +856,9 @@ export default function Home() {
 
           <div className="space-y-6">
             {[
-              "Corporate responsibility",
-              "Experts with team spirits",
-              "Diversity, equality & inclusion",
+              "Save 60% On/Off-Site Time ",
+              "See Everything in Real Time ",
+              "Talk & Act Faster ",
             ].map((title, idx) => (
               <div key={idx} className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
@@ -867,8 +869,8 @@ export default function Home() {
                 <div>
                   <h3 className="font-semibold text-lg">{title}</h3>
                   <p className="text-gray-500 text-sm">
-                    Our goal is zero incidents and our lost time frequency rate
-                    is industry leading.
+                  Automate reports & records,Dashboards & updates Centralized chat & alerts Built in safety protocols. 
+
                   </p>
                 </div>
               </div>
@@ -925,7 +927,7 @@ export default function Home() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
             <Image src="/logo.png" alt="BuildKaam" width={36} height={36} className="rounded-md" />
-            <span className="font-semibold text-xl text-white">BuildKaam</span>
+            <span className="font-semibold text-xl text-white">buildkaam</span>
           </Link>
 
         {/* Right Section - Footer Links */}
@@ -962,25 +964,11 @@ export default function Home() {
             <h3 className="mb-3 font-semibold text-white">Social</h3>
             <ul className="space-y-1">
               <li>
-                <a href="/" className="hover:text-gray-200">
+                <a href=" https://www.instagram.com/buildkaam?igsh=OWViZ3JxejU2cG45 " className="hover:text-gray-200">
                   Instagram
                 </a>
               </li>
-              <li>
-                <a href="/" className="hover:text-gray-200">
-                  Discord
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-gray-200">
-                  Youtube
-                </a>
-              </li>
-              <li>
-                <a href="/" className="hover:text-gray-200">
-                  X
-                </a>
-              </li>
+             
             </ul>
           </div>
 
@@ -1016,7 +1004,10 @@ export default function Home() {
        BUILD KAAM
       </div>
     </footer>
- 
+    
+    {/* Floating AI button only on landing page */}
+    <FloatingAIButton />
+
     </div>
   )
 }

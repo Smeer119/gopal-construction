@@ -916,7 +916,7 @@ const generateBulkPDF = async (): Promise<void> => {
         doc.setPage(p);
         doc.setFontSize(9);
         doc.setTextColor(120);
-        const footerText = 'Generated from BUILD KAAM';
+        const footerText = 'Generated from buildkaam';
         doc.text(footerText, marginX, pageHeight - 16);
         const pageStr = `Page ${p} of ${pageCount}`;
         doc.text(pageStr, pageWidth - marginX - 80, pageHeight - 16);

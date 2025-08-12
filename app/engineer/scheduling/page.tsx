@@ -503,7 +503,7 @@ export default function ConstructionSchedulingPage() {
       doc.setFontSize(10);
       doc.setTextColor(150);
       doc.text(
-        "Construction Project Management System",
+        "Construction Project Management System with buildkaam",
         doc.internal.pageSize.getWidth() / 2,
         doc.internal.pageSize.getHeight() - 5,
         { align: "center" }
