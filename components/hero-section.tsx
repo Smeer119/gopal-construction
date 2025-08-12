@@ -76,15 +76,23 @@ export function HeroSection({
           </p>
 
           {/* Actions */}
-          <div className="relative z-10 flex animate-appear justify-center gap-4 opacity-0 delay-300">
+          <div className="relative z-10 flex flex-wrap justify-center gap-4 animate-appear opacity-100">
             {actions.map((action, index) => (
-              <Button key={index} variant={action.variant} size="lg" asChild>
-                <a href={action.href} className="flex items-center gap-2 overflow-hidden">
-                  <span className="flex-shrink-0">{action.icon}</span>
-                  <span className="truncate">{action.text}</span>
-                </a>
-              </Button>
-            ))}
+              action && (
+                <Button 
+                  key={index} 
+                  variant={action.variant || 'default'}
+                  size="lg" 
+                  className="flex items-center gap-2 min-w-[120px] justify-center"
+                  asChild
+                >
+                  <a href={action.href}>
+                    {action.icon}
+                    <span>{action.text}</span>
+                  </a>
+                </Button>
+              )
+            )).filter(Boolean)}
           </div>
 
           {/* Image with Glow */}

@@ -464,8 +464,8 @@ export default function Home() {
           },
         ].filter(Boolean)}
         image={{
-          light: "/video-preview.png",
-          dark: "/video-preview.png",
+          light: "/images/hero-image.png",
+          dark: "/images/hero-image.png",
           alt: "Construction Dashboard Preview",
         }}
       />
