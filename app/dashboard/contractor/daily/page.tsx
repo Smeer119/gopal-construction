@@ -1763,7 +1763,7 @@ export default function MaterialManagementPage() {
                                 </TableCell>
                               </TableRow>
                             ))
-                          : (
+                          ) : (
                             <TableRow>
                               <TableCell
                                 colSpan={3}
