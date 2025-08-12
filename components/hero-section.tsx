@@ -47,9 +47,9 @@ export function HeroSection({
   return (
     <section
       className={cn(
-        "bg-background text-foreground",
+        "bg-gradient-to-b from-background to-gray-50 dark:to-gray-900 text-foreground",
         "py-12 sm:py-24 md:py-32 px-4",
-        "fade-bottom overflow-hidden pb-0"
+        "overflow-hidden"
       )}
     >
       <div className="mx-auto flex max-w-container flex-col gap-12 pt-16 sm:gap-24">
@@ -97,23 +97,18 @@ export function HeroSection({
 
           {/* Image with Glow */}
           <div className="relative pt-12">
-            <MockupFrame
-              className="animate-appear opacity-0 delay-700"
-              size="small"
-            >
-              <Mockup type="responsive">
-                <div className="relative w-full h-auto">
+            <div className="relative w-full max-w-6xl mx-auto">
+              <div className="relative w-full aspect-video bg-gray-100 dark:bg-gray-800 rounded-xl overflow-hidden shadow-2xl">
                 <Image
-                  src={"/images/hero-image.png"}
+                  src={image.light}
                   alt={image.alt}
-                  width={1248}
-                  height={765}
+                  fill
                   priority
-                  className="w-full h-auto"
+                  className="object-cover object-center"
+                  sizes="(max-width: 1024px) 100vw, 1024px"
                 />
               </div>
-              </Mockup>
-            </MockupFrame>
+            </div>
             <Glow
               variant="top"
               className="animate-appear-zoom opacity-0 delay-1000"
