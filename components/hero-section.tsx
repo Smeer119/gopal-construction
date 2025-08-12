@@ -94,13 +94,16 @@ export function HeroSection({
               size="small"
             >
               <Mockup type="responsive">
+                <div className="relative w-full h-auto">
                 <Image
-                  src={"https://cdn.dribbble.com/userupload/42794059/file/original-eb97be7226ed707d69e5a42a04c96f1f.png?resize=1504x1128&vertical=center"}
+                  src={"/images/hero-image.png"}
                   alt={image.alt}
                   width={1248}
                   height={765}
                   priority
+                  className="w-full h-auto"
                 />
+              </div>
               </Mockup>
             </MockupFrame>
             <Glow
